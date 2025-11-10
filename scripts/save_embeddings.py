@@ -59,10 +59,10 @@ def main():
 
     # Load and process image
     logger.info('Processing image: %s', args.image)
-    image = Image.open(args.image).convert('RGB')
+    image = Image.open(args.image) #.convert('RGB')
     
     # Get image embeddings
-    image_inputs = processor(images=image, return_tensors='pt')
+    image_inputs = processor(images=[image], return_tensors='pt')
     image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
     
     with torch.no_grad():
