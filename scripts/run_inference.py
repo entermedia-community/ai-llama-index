@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--max_new_tokens', type=int, default=128)
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger('run_inference')
 
     if not os.path.exists(args.embeddings):
@@ -71,7 +71,11 @@ def main():
 
     logger.info('Loading processor and model from: %s', model_path)
     processor = AutoProcessor.from_pretrained(model_path)
-    model = Qwen3VLForConditionalGeneration.from_pretrained(model_path, dtype="auto", device_map="auto").to(device)
+    model = Qwen3VLForConditionalGeneration.from_pretrained(
+        model_path, 
+        dtype="auto", 
+        device_map="auto"
+    )
 
     # Move image embeddings to device
     # image_embeds = image_embeds.to(device)
