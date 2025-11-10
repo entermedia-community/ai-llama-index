@@ -51,7 +51,12 @@ def main():
     
     logger.info('Loading processor and model from: %s', model_path)
     processor = AutoProcessor.from_pretrained(model_path)
-    model = Qwen3VLForConditionalGeneration.from_pretrained(model_path, dtype="auto", device_map="auto").to(device)
+    model = Qwen3VLForConditionalGeneration.from_pretrained(
+        model_path, 
+        dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
+        device_map="auto",
+    )
 
     # Load and process image
     logger.info('Processing image: %s', args.image)
