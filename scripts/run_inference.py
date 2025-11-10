@@ -58,7 +58,7 @@ def main():
 
     # Import transformers here (fail early with clear message)
     try:
-        from transformers import Qwen3VForConditionalGeneration, Qwen3VProcessor
+        from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
     except Exception as e:
         logger.exception('Failed to import Qwen3V classes from transformers; ensure your venv has a transformers build with Qwen3V support')
         raise
@@ -69,8 +69,8 @@ def main():
         raise SystemExit(1)
 
     logger.info('Loading processor and model from: %s', model_path)
-    processor = Qwen3VProcessor.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)
-    model = Qwen3VForConditionalGeneration.from_pretrained(model_path, local_files_only=True, trust_remote_code=True).to(device)
+    processor = AutoProcessor.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)
+    model = Qwen3VLForConditionalGeneration.from_pretrained(model_path, local_files_only=True, trust_remote_code=True).to(device)
 
     # Move image embeddings to device
     image_embeds = image_embeds.to(device)

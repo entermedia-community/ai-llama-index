@@ -10,9 +10,10 @@ logger = logging.getLogger(__name__)
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO)
 
+
 try:
     # Import Qwen3V model and processor (must be available in the environment)
-    from transformers import Qwen3VForConditionalGeneration, Qwen3VProcessor
+    from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
 except Exception as e:
     logger.error("Failed to import Qwen3V classes from transformers: %s: %s", type(e).__name__, e)
     raise ImportError("Qwen3V support is required: install a transformers build that provides Qwen3V") from e
@@ -42,8 +43,8 @@ def extract_multimodal_embeddings(text: str, image_path: str, device: str = None
     logger.debug("Opened image %s (size=%s)", image_path, image.size)
 
     # Use Qwen3V. Allow overriding model_name.
-    processor_cls = Qwen3VProcessor
-    model_cls = Qwen3VForConditionalGeneration
+    processor_cls = AutoProcessor
+    model_cls = Qwen3VLForConditionalGeneration
     model_path = model_name or DEFAULT_QWEN3_MODEL
     logger.info("Using Qwen3V model from path: %s", model_path)
 

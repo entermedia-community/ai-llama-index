@@ -38,7 +38,7 @@ def main():
     logger.info('Running on device: %s', device)
 
     try:
-        from transformers import Qwen3VForConditionalGeneration, Qwen3VProcessor
+        from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
     except Exception as e:
         logger.exception('Failed to import Qwen3V classes from transformers')
         raise
@@ -49,8 +49,8 @@ def main():
         raise SystemExit(1)
 
     logger.info('Loading processor and model from: %s', model_path)
-    processor = Qwen3VProcessor.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)
-    model = Qwen3VForConditionalGeneration.from_pretrained(model_path, local_files_only=True, trust_remote_code=True).to(device)
+    processor = AutoProcessor.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)
+    model = Qwen3VLForConditionalGeneration.from_pretrained(model_path, local_files_only=True, trust_remote_code=True).to(device)
 
     # Load and process image
     logger.info('Processing image: %s', args.image)
