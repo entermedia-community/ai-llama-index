@@ -84,14 +84,16 @@ def main():
     text_inputs = processor(text=prompt_text, return_tensors='pt')
     text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
 
+    text_embeds = model.get_text_features(text_inputs['input_ids'])
+    inputs_embeds = torch.cat([text_embeds, image_embeds], dim=1)
     # Generate
     logger.info('Generating with max_new_tokens=%d', args.max_new_tokens)
     with torch.no_grad():
         try:
             gen = model.generate(
-                input_ids=text_inputs['input_ids'],
-                attention_mask=text_inputs['attention_mask'],
-                image_embeds=image_embeds,
+                # input_ids=text_inputs['input_ids'],
+                # attention_mask=text_inputs['attention_mask'],
+                inputs_embeds=inputs_embeds,
                 max_new_tokens=100
             )
         except TypeError:
