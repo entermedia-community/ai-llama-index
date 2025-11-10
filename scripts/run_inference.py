@@ -19,7 +19,7 @@ import argparse
 import logging
 import os
 import torch
-from PIL import Image
+# from PIL import Image
 
 
 def main():
@@ -38,7 +38,7 @@ def main():
         logger.error('Embeddings file not found: %s', args.embeddings)
         raise SystemExit(1)
 
-    device = args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
+    device = "cuda" # args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info('Running on device: %s', device)
 
     # Load embeddings file
