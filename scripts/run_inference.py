@@ -42,7 +42,7 @@ def main():
     logger.info('Running on device: %s', device)
 
     # Load embeddings file
-    data = torch.load(args.embeddings, map_location='cpu')
+    data = torch.load(args.embeddings)
 
     text = data.get('text')
     image_embeds = data.get('image_embeds')
@@ -83,23 +83,20 @@ def main():
     # Process text only
     text_inputs = processor(text=prompt_text, return_tensors='pt')
     text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
-    
-    # Combine into final inputs
-    inputs = {
-        'input_ids': text_inputs['input_ids'],
-        'attention_mask': text_inputs.get('attention_mask'),
-        'image_embeds': image_embeds
-    }
-    inputs = {k: v for k, v in inputs.items() if v is not None}
 
     # Generate
     logger.info('Generating with max_new_tokens=%d', args.max_new_tokens)
     with torch.no_grad():
         try:
-            gen = model.generate(**inputs, max_new_tokens=args.max_new_tokens)
+            gen = model.generate(
+                input_ids=text_inputs['input_ids'],
+                attention_mask=text_inputs['attention_mask'],
+                image_embeds=image_embeds,
+                max_new_tokens=100
+            )
         except TypeError:
-            # Some model implementations expect explicit input_ids/pixel_values
-            gen = model.generate(input_ids=inputs.get('input_ids'), pixel_values=inputs.get('pixel_values'), max_new_tokens=args.max_new_tokens)
+            logger.error('Model.generate() raised TypeError; this may indicate an incompatible transformers version. Ensure your transformers build supports Qwen3V.')
+            raise
 
     # Decode
     output_text = None
