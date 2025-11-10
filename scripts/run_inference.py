@@ -26,7 +26,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--embeddings', required=True, help='Path to .pt embeddings file')
     parser.add_argument('--model', required=False, default=None, help='Local model path to load (overrides default)')
-    parser.add_argument('--device', required=False, default=None, help='Device to run on (cpu/cuda)')
+    # parser.add_argument('--device', required=False, default=None, help='Device to run on (cpu/cuda)')
     parser.add_argument('--prompt', required=False, default=None, help='Optional extra text to append to the saved text')
     parser.add_argument('--max_new_tokens', type=int, default=128)
     args = parser.parse_args()
