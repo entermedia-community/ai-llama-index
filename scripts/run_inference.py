@@ -64,9 +64,10 @@ def main():
         raise
 
     model_path = args.model or 'Qwen/Qwen3-VL-8B-Instruct'
-    if not os.path.exists(model_path):
-        logger.error('Model path does not exist: %s', model_path)
-        raise SystemExit(1)
+
+    # if not os.path.exists(model_path):
+    #     logger.error('Model path does not exist: %s', model_path)
+    #     raise SystemExit(1)
 
     logger.info('Loading processor and model from: %s', model_path)
     processor = AutoProcessor.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)

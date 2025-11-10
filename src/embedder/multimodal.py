@@ -48,8 +48,8 @@ def extract_multimodal_embeddings(text: str, image_path: str, device: str = None
     model_path = model_name or DEFAULT_QWEN3_MODEL
     logger.info("Using Qwen3V model from path: %s", model_path)
 
-    if not os.path.exists(model_path):
-        raise RuntimeError(f"Model path does not exist: {model_path}")
+    # if not os.path.exists(model_path):
+    #     raise RuntimeError(f"Model path does not exist: {model_path}")
 
     logger.debug("Loading processor")
     processor = processor_cls.from_pretrained(
