@@ -53,8 +53,7 @@ def main():
     processor = AutoProcessor.from_pretrained(model_path)
     model = Qwen3VLForConditionalGeneration.from_pretrained(
         model_path, 
-        dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
+        dtype="auto",
         device_map="auto",
     )
 
