@@ -45,11 +45,6 @@ def main():
     data = torch.load(args.embeddings)
 
     text = data.get('text')
-    image_embeds = data.get('image_embeds')
-
-    if text is None or image_embeds is None:
-        logger.error('Embeddings file is missing required fields. Found keys: %s', list(data.keys()))
-        raise SystemExit(1)
 
     if args.prompt:
         prompt_text = text + '\n' + args.prompt
@@ -77,6 +72,9 @@ def main():
         device_map="auto"
     )
 
+    image_embeds = data.get('image_embeds')
+    image_embeds = image_embeds.to(model.device).to(model.dtype)
+
     # Move image embeddings to device
     # image_embeds = image_embeds.to(device)
     
@@ -84,8 +82,8 @@ def main():
     text_inputs = processor(text=prompt_text, return_tensors='pt')
     text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
 
-    text_embeds = model.get_text_features(text_inputs['input_ids'])
-    inputs_embeds = torch.cat([text_embeds, image_embeds], dim=1)
+    # text_embeds = model.get_text_features(text_inputs['input_ids'])
+    # inputs_embeds = torch.cat([text_embeds, image_embeds], dim=1)
     # Generate
     logger.info('Generating with max_new_tokens=%d', args.max_new_tokens)
     with torch.no_grad():
@@ -93,7 +91,8 @@ def main():
             gen = model.generate(
                 # input_ids=text_inputs['input_ids'],
                 # attention_mask=text_inputs['attention_mask'],
-                inputs_embeds=inputs_embeds,
+                inputs_embeds=image_embeds,
+                attention_mask=torch.ones(image_embeds.shape[:2], device=model.device),
                 max_new_tokens=100
             )
         except TypeError:
