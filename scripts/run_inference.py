@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Run inference using saved image embeddings with the Qwen3V model.
+
+This script expects a .pt file containing saved image embeddings and original text.
+It will load the embeddings directly without needing the original image file.
+
+Usage:
+  python scripts/run_inference.py --embeddings embeddings.pt --model /path/to/qwen3v.gguf --device cpu
+
+Options:
+  --embeddings   Path to the .pt file saved by save_embeddings.py
+  --model        Local model path (directory or file) to load Qwen3V from. If omitted,
+                 the default in `src/embedder/multimodal.py` is used.
+  --device       Device to run on (cpu or cuda). Defaults to 'cuda' if available.
+  --prompt       Optional extra prompt / question to append to the saved text
+  --max_new_tokens Number of tokens to generate (default: 128)
+"""
+import argparse
+import logging
+import os
+import torch
+from PIL import Image
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--embeddings', required=True, help='Path to .pt embeddings file')
+    parser.add_argument('--model', required=False, default=None, help='Local model path to load (overrides default)')
+    parser.add_argument('--device', required=False, default=None, help='Device to run on (cpu/cuda)')
+    parser.add_argument('--prompt', required=False, default=None, help='Optional extra text to append to the saved text')
+    parser.add_argument('--max_new_tokens', type=int, default=128)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger('run_inference')
+
+    if not os.path.exists(args.embeddings):
+        logger.error('Embeddings file not found: %s', args.embeddings)
+        raise SystemExit(1)
+
+    device = args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info('Running on device: %s', device)
+
+    # Load embeddings file
+    data = torch.load(args.embeddings, map_location='cpu')
+
+    text = data.get('text')
+    image_embeds = data.get('image_embeds')
+
+    if text is None or image_embeds is None:
+        logger.error('Embeddings file is missing required fields. Found keys: %s', list(data.keys()))
+        raise SystemExit(1)
+
+    if args.prompt:
+        prompt_text = text + '\n' + args.prompt
+    else:
+        prompt_text = text
+
+    # Import transformers here (fail early with clear message)
+    try:
+        from transformers import Qwen3VForConditionalGeneration, Qwen3VProcessor
+    except Exception as e:
+        logger.exception('Failed to import Qwen3V classes from transformers; ensure your venv has a transformers build with Qwen3V support')
+        raise
+
+    model_path = args.model or '/models/unsloth_Qwen3-VL-8B-Instruct-GGUF_Qwen3-VL-8B-Instruct-Q4_K_M.gguf'
+    if not os.path.exists(model_path):
+        logger.error('Model path does not exist: %s', model_path)
+        raise SystemExit(1)
+
+    logger.info('Loading processor and model from: %s', model_path)
+    processor = Qwen3VProcessor.from_pretrained(model_path, local_files_only=True, trust_remote_code=True)
+    model = Qwen3VForConditionalGeneration.from_pretrained(model_path, local_files_only=True, trust_remote_code=True).to(device)
+
+    # Move image embeddings to device
+    image_embeds = image_embeds.to(device)
+    
+    # Process text only
+    text_inputs = processor(text=prompt_text, return_tensors='pt')
+    text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+    
+    # Combine into final inputs
+    inputs = {
+        'input_ids': text_inputs['input_ids'],
+        'attention_mask': text_inputs.get('attention_mask'),
+        'image_embeds': image_embeds
+    }
+    inputs = {k: v for k, v in inputs.items() if v is not None}
+
+    # Generate
+    logger.info('Generating with max_new_tokens=%d', args.max_new_tokens)
+    with torch.no_grad():
+        try:
+            gen = model.generate(**inputs, max_new_tokens=args.max_new_tokens)
+        except TypeError:
+            # Some model implementations expect explicit input_ids/pixel_values
+            gen = model.generate(input_ids=inputs.get('input_ids'), pixel_values=inputs.get('pixel_values'), max_new_tokens=args.max_new_tokens)
+
+    # Decode
+    output_text = None
+    try:
+        # Processor likely exposes a tokenizer
+        tokenizer = getattr(processor, 'tokenizer', None)
+        if tokenizer is not None:
+            output_text = tokenizer.decode(gen[0], skip_special_tokens=True)
+        else:
+            # try model's tokenizer attr
+            tokenizer = getattr(model, 'tokenizer', None)
+            if tokenizer is not None:
+                output_text = tokenizer.decode(gen[0], skip_special_tokens=True)
+    except Exception:
+        output_text = None
+
+    if output_text is None:
+        # Fallback to string of token ids
+        logger.warning('Could not decode tokens to text using processor/tokenizer; printing token ids instead')
+        output_text = str(gen[0].tolist())
+
+    print('\n=== Generated Output ===\n')
+    print(output_text)
+
+
+if __name__ == '__main__':
+    main()
