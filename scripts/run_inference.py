@@ -92,7 +92,7 @@ def main():
                 # input_ids=text_inputs['input_ids'],
                 # attention_mask=text_inputs['attention_mask'],
                 inputs_embeds=image_embeds,
-                attention_mask=torch.ones(image_embeds.shape[:2], device=model.device),
+                # attention_mask=torch.ones(image_embeds.shape[:2], device=model.device),
                 max_new_tokens=100
             )
         except TypeError:
