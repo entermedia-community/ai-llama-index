@@ -67,13 +67,14 @@ def main():
     
     with torch.no_grad():
         # Extract image features/embeddings
-        image_outputs = model.get_image_features(**{k: v for k, v in image_inputs.items() if k != 'input_ids' and k != 'attention_mask'})
+        image_embeds = model.get_image_features(**{k: v for k, v in image_inputs.items() if k != 'input_ids' and k != 'attention_mask'})
         #image_embeds = image_outputs.image_embeds
 
     # Save embeddings and text
     logger.info('Saving embeddings to: %s', args.output)
     torch.save({
-        'image_outputs': image_outputs 
+        'text': args.text,
+        'image_embeds': image_embeds.cpu(),
     }, args.output)
     logger.info('Done! Use run_inference.py with this file to generate outputs')
 
