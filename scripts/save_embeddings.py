@@ -47,7 +47,8 @@ def main():
     # if not os.path.exists(model_path):
     #     logger.error('Model path does not exist: %s', model_path)
     #     raise SystemExit(1)
-
+    print("Model:", model_path)
+    
     logger.info('Loading processor and model from: %s', model_path)
     processor = AutoProcessor.from_pretrained(model_path)
     model = Qwen3VLForConditionalGeneration.from_pretrained(model_path, dtype="auto", device_map="auto").to(device)
