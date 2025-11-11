@@ -63,6 +63,10 @@ def main():
     
     # Get image embeddings
     image_inputs = processor(images=[args.image], text=[args.text], return_tensors='pt')
+    
+    print("Image inputs:", image_inputs)
+    print("Keys:", image_inputs.keys())
+    
     image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
     
     with torch.no_grad():
