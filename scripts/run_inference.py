@@ -78,13 +78,23 @@ def main():
         logger.error('No image_embeds key found in %s', args.embeddings)
         raise SystemExit(1)
     
+    # Unwrap if it's a tuple containing a list with tensor
+    if isinstance(image_embeds, tuple):
+        image_embeds = image_embeds[0]
+    if isinstance(image_embeds, list):
+        image_embeds = image_embeds[0]
+    
+    # Get the device from the model's first parameter (works with device_map="auto")
+    model_device = next(model.parameters()).device
+    model_dtype = next(model.parameters()).dtype
+    
     # Move image embeddings to the model's device and dtype
-    image_embeds = image_embeds.to(model.device).to(model.dtype)
+    image_embeds = image_embeds.to(model_device).to(model_dtype)
     logger.info('Loaded image embeddings with shape: %s', image_embeds.shape)
     
     # Process text only
     text_inputs = processor(text=prompt_text, return_tensors='pt')
-    text_inputs = {k: v.to(model.device) for k, v in text_inputs.items()}
+    text_inputs = {k: v.to(model_device) for k, v in text_inputs.items()}
 
     # Generate using the pre-computed image embeddings
     logger.info('Generating with max_new_tokens=%d', args.max_new_tokens)
