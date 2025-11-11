@@ -61,80 +61,53 @@ def main():
     logger.info('Processing image: %s', args.image)
     image = Image.open(args.image).convert('RGB')
     
-    # Process inputs for the model
-    logger.info('Processing inputs with processor')
-    inputs = processor(images=image, text=args.text, return_tensors='pt')
+    # Process image and text inputs through the processor
+    # The processor handles the conversion to model inputs
+    inputs = processor(
+        text=args.text,
+        images=image,
+        return_tensors="pt"
+    )
     inputs = {k: v.to(device) for k, v in inputs.items()}
     
-    logger.debug('Input keys: %s', list(inputs.keys()))
-    
-    # Extract embeddings using the model's encoder
-    visual_emb = None
-    text_emb = None
-    
+    logger.info('Extracting embeddings from model...')
     with torch.no_grad():
-        # Try to use get_image_features and get_text_features if available
-        if hasattr(model, 'get_image_features') and hasattr(model, 'get_text_features'):
-            try:
-                visual_emb = model.get_image_features(pixel_values=inputs.get('pixel_values'))
-                logger.info('Extracted visual embeddings via get_image_features: shape=%s', visual_emb.shape)
-            except Exception as e:
-                logger.warning('get_image_features failed: %s', e)
-                visual_emb = None
-            
-            try:
-                text_emb = model.get_text_features(input_ids=inputs.get('input_ids'))
-                logger.info('Extracted text embeddings via get_text_features: shape=%s', text_emb.shape)
-            except Exception as e:
-                logger.warning('get_text_features failed: %s', e)
-                text_emb = None
+        # Forward pass through the model to get hidden states
+        # We'll use the model's encoder or get embeddings from input stage
+        outputs = model(**inputs, output_hidden_states=True, return_dict=True)
         
-        # Fallback: use encoder directly
-        if visual_emb is None or text_emb is None:
-            logger.info('Using encoder fallback method')
-            try:
-                encoder = model.get_encoder()
-                encoder_output = encoder(**inputs)
-                
-                # Try to get image_embeds and text_embeds from encoder output
-                if visual_emb is None:
-                    visual_emb = getattr(encoder_output, 'image_embeds', None)
-                if text_emb is None:
-                    text_emb = getattr(encoder_output, 'text_embeds', None)
-                
-                # Last resort: use last_hidden_state with mean pooling
-                if visual_emb is None and hasattr(encoder_output, 'last_hidden_state'):
-                    visual_emb = encoder_output.last_hidden_state.mean(dim=1)
-                    logger.info('Using mean-pooled last_hidden_state for visual: shape=%s', visual_emb.shape)
-                if text_emb is None and hasattr(encoder_output, 'last_hidden_state'):
-                    text_emb = encoder_output.last_hidden_state.mean(dim=1)
-                    logger.info('Using mean-pooled last_hidden_state for text: shape=%s', text_emb.shape)
-                    
-            except Exception as e:
-                logger.exception('Encoder fallback failed')
-                raise RuntimeError('Unable to extract embeddings from model') from e
+        # Get the last hidden state which represents the processed embeddings
+        # This contains both image and text information fused together
+        if hasattr(outputs, 'hidden_states') and outputs.hidden_states:
+            # Use the last hidden state from the model
+            inputs_embeds = outputs.hidden_states[-1]
+        elif hasattr(outputs, 'encoder_hidden_states') and outputs.encoder_hidden_states:
+            inputs_embeds = outputs.encoder_hidden_states[-1]
+        else:
+            # Fallback: get embeddings from the embedding layer
+            inputs_embeds = model.get_input_embeddings()(inputs['input_ids'])
         
-        if visual_emb is None or text_emb is None:
-            raise RuntimeError(f'Failed to extract embeddings: visual={visual_emb is not None}, text={text_emb is not None}')
-        
-        # Create multimodal embedding by concatenating visual and text
-        multimodal_emb = torch.cat([visual_emb, text_emb], dim=-1).squeeze()
-        logger.info('Created multimodal embedding: shape=%s', multimodal_emb.shape)
+        logger.info('Extracted embeddings shape: %s', inputs_embeds.shape)
 
-    # Save embeddings and text
+    # Save embeddings, text, and necessary metadata for inference
     logger.info('Saving embeddings to: %s', args.output)
-    torch.save({
-        'visual_embedding': visual_emb.cpu().squeeze(),
-        'text_embedding': text_emb.cpu().squeeze(),
-        'multimodal_embedding': multimodal_emb.cpu(),
-        'input_ids': inputs.get('input_ids', torch.tensor([])).cpu(),
+    save_dict = {
         'text': args.text,
-        'image_path': args.image,
-    }, args.output)
+        'inputs_embeds': inputs_embeds.cpu(),
+        'model_path': model_path
+    }
     
-    logger.info('Embedding shapes: visual=%s, text=%s, multimodal=%s',
-                visual_emb.shape, text_emb.shape, multimodal_emb.shape)
-    logger.info('Done! Use run_inference.py with this file to generate outputs')
+    # Save optional input components that may be needed for generation
+    if 'attention_mask' in inputs:
+        save_dict['attention_mask'] = inputs['attention_mask'].cpu()
+    if 'image_grid_thw' in inputs:
+        save_dict['image_grid_thw'] = inputs['image_grid_thw'].cpu()
+    if 'input_ids' in inputs:
+        save_dict['input_ids'] = inputs['input_ids'].cpu()
+    
+    torch.save(save_dict, args.output)
+    logger.info('Done! Embeddings saved with shape: %s', inputs_embeds.shape)
+    logger.info('Use run_inference.py with this file to generate outputs')
 
 
 if __name__ == "__main__":
