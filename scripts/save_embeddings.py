@@ -12,7 +12,8 @@ import argparse
 import logging
 import os
 import torch
-from PIL import Image
+# from PIL import Image
+from transformers.image_utils import load_image
 
 
 def main():
@@ -59,27 +60,25 @@ def main():
 
     # Load and process image
     logger.info('Processing image: %s', args.image)
-    image = Image.open(args.image) #.convert('RGB')
+    image = load_image(args.image)
     
     # Get image embeddings
-    image_inputs = processor(images=[args.image], text=[args.text], return_tensors='pt')
+    image_inputs = processor(images=image, return_tensors='pt')
 
-    image_inputs = {k: v.to(device) for k, v in image_inputs.items()}
-    
-    image_embeds = None
-
-    with torch.no_grad():
-        # Extract image features/embeddings
-        image_embeds = model.get_image_features(**{k: v for k, v in image_inputs.items() if k != 'input_ids' and k != 'attention_mask'})
-        #image_embeds = image_outputs.image_embeds
+    with torch.inference_mode():
+        image_features = model.get_image_features(**image_inputs)
 
     # Save embeddings and text
     logger.info('Saving embeddings to: %s', args.output)
     torch.save({
         'text': args.text,
-        'image_embeds': image_embeds
+        'image_embeds': image_features
     }, args.output)
     logger.info('Done! Use run_inference.py with this file to generate outputs')
+    
+    print("Image Inputs:", image_inputs)
+    print("Image Features:", image_features)
+
 
 
 if __name__ == "__main__":
