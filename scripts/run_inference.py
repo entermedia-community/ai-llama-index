@@ -72,7 +72,7 @@ def main():
         device_map="auto"
     )
 
-    image_embeds = data.get('image_embeds')[0][0]
+    image_embeds = data.get('image_embeds')[0]
     # image_embeds = image_embeds.to(model.device).to(model.dtype)
 
     # Move image embeddings to device
