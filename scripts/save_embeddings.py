@@ -81,13 +81,6 @@ def main():
     }, args.output)
     logger.info('Done! Use run_inference.py with this file to generate outputs')
 
-    print("Image inputs:", image_inputs)
-    print("Keys:", image_inputs.keys())
-
-    print("Image embeds:", image_embeds)
-    print("Image embeds shape:", image_embeds.shape)
-    print("Image embeds dtype:", image_embeds.dtype)
-
 
 if __name__ == "__main__":
     main()
