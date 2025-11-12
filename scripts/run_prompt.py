@@ -107,10 +107,10 @@ def main():
             output_ids = model.generate(
                 **text_inputs,
                 do_sample=False,          # disable random sampling
-                num_beams=5,              # beam search
+                #num_beams=5,              # beam search
                 temperature=0.5,          # less randomness
                 max_new_tokens=100,
-                repetition_penalty=1.2
+                #repetition_penalty=1.2
                 # max_new_tokens=args.max_new_tokens,
                 #do_sample=True,
                 #temperature=0.7,
