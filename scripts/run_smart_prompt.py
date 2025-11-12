@@ -117,11 +117,26 @@ def main():
             cached_image = cache_data.get('image_path', 'unknown')
             
             if past_key_values:
-                # Move KV cache to device
-                past_key_values = tuple(
-                    tuple(t.to(device) if hasattr(t, 'to') else t for t in layer)
-                    for layer in past_key_values
-                )
+                # Convert tuple to Cache instance for newer transformers
+                try:
+                    from transformers import DynamicCache
+                    if isinstance(past_key_values, tuple):
+                        logger.info('Converting tuple past_key_values to DynamicCache instance')
+                        cache = DynamicCache()
+                        # Import the key_values into the cache
+                        for layer_idx, (key, value) in enumerate(past_key_values):
+                            cache.update(key.to(device), value.to(device), layer_idx)
+                        past_key_values = cache
+                    else:
+                        # Already a Cache instance, just move to device
+                        past_key_values = past_key_values.to(device) if hasattr(past_key_values, 'to') else past_key_values
+                except ImportError:
+                    logger.warning('DynamicCache not available, keeping as tuple (may not work with newer transformers)')
+                    # Move tuple elements to device
+                    past_key_values = tuple(
+                        tuple(t.to(device) if hasattr(t, 'to') else t for t in layer)
+                        for layer in past_key_values
+                    )
                 
             if cached_input_ids is not None:
                 cached_input_ids = cached_input_ids.to(device)
