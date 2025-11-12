@@ -99,13 +99,19 @@ def main():
             embeddings_data = torch.load(args.embeddings, map_location=device)
             raw_embeds = embeddings_data['image_embeds']
             
-            # Handle tuple or tensor
-            if isinstance(raw_embeds, tuple):
-                # If it's a tuple, take the first element (usually the embeddings)
-                image_embeds = raw_embeds[0]
-                logger.info('Extracted embeddings from tuple (length: %d)', len(raw_embeds))
-            else:
-                image_embeds = raw_embeds
+            # Handle tuple or tensor - recursively extract if needed
+            def extract_tensor(obj):
+                """Recursively extract the first tensor from nested tuples."""
+                if hasattr(obj, 'shape') and hasattr(obj, 'to'):
+                    # It's a tensor
+                    return obj
+                elif isinstance(obj, (tuple, list)) and len(obj) > 0:
+                    # It's a tuple/list, try first element
+                    return extract_tensor(obj[0])
+                else:
+                    return obj
+            
+            image_embeds = extract_tensor(raw_embeds)
             
             # Move to device if it's a tensor
             if hasattr(image_embeds, 'to'):
@@ -113,7 +119,9 @@ def main():
             
             saved_text = embeddings_data.get('text', '')
             logger.info('Loaded embeddings with saved text: %s', saved_text)
-            logger.info('Embeddings shape: %s', image_embeds.shape if hasattr(image_embeds, 'shape') else type(image_embeds))
+            logger.info('Embeddings type: %s', type(image_embeds))
+            if hasattr(image_embeds, 'shape'):
+                logger.info('Embeddings shape: %s', image_embeds.shape)
         except Exception as e:
             logger.error('Failed to load embeddings file.')
             logger.exception(e)
@@ -163,7 +171,23 @@ def main():
             
             # Add image embeddings if available
             if image_embeds is not None:
-                logger.info('Adding image embeddings to generation (shape: %s)', image_embeds.shape)
+                embed_shape = image_embeds.shape if hasattr(image_embeds, 'shape') else f'type: {type(image_embeds)}'
+                logger.info('Adding image embeddings to generation (shape: %s)', embed_shape)
+                
+                # If still a tuple, we need to handle it differently
+                if isinstance(image_embeds, tuple):
+                    logger.warning('image_embeds is still a tuple, attempting to extract tensor')
+                    # Try different tuple elements
+                    for i, elem in enumerate(image_embeds):
+                        logger.info('Tuple element %d: type=%s, shape=%s', i, type(elem), 
+                                   getattr(elem, 'shape', 'no shape'))
+                    # Use the first tensor we find
+                    for elem in image_embeds:
+                        if hasattr(elem, 'shape'):
+                            image_embeds = elem
+                            logger.info('Using tensor with shape: %s', image_embeds.shape)
+                            break
+                
                 generate_kwargs['image_embeds'] = image_embeds
             
             output_ids = model.generate(**generate_kwargs)
