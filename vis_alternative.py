@@ -14,7 +14,7 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, dtype="auto"
 
 images, _ = process_vision_info(messages, image_patch_size=16)
 
-inputs = processor(images=images, return_tensors="pt")
+inputs = processor(images=images, tokenize=True, return_tensors="pt")
 inputs = inputs.to(model.device)
 
 torch.save(inputs, "inputs-alt.pt")
