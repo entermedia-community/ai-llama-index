@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
-"""Run a basic AI prompt using the Qwen3-VL-8B-Instruct model.
+"""Run prompts using cached model state from image processing.
 
-This script loads the Qwen3V model and processor, then runs a user-provided
-prompt and generates text output using PyTorch.
+This script loads a cached model state (from save_embeddings.py) and runs
+new prompts without reprocessing the image, saving significant computation.
 
 Usage:
-  python scripts/run_prompt.py --prompt "What is artificial intelligence?" --max_new_tokens 256
+  python scripts/run_smart_prompt.py --cache cache.pt --prompt "What colors do you see?"
+  
+Or without cache (processes from scratch):
+  python scripts/run_smart_prompt.py --prompt "What is AI?" --max_new_tokens 256
 
 Options:
   --prompt           The text prompt to send to the model (required)
-  --embeddings       Read in the embeddings from a .pt file saved by save_embeddings.py
+  --cache            Path to cached model state from save_embeddings.py
   --model            Model identifier (default: 'Qwen/Qwen3-VL-8B-Instruct')
   --max_new_tokens   Number of tokens to generate (default: 128)
   --device           Device to run on (cpu or cuda). Defaults to cuda if available.
 """
 import argparse
 import logging
+import os
 import torch
 
 
@@ -34,8 +38,8 @@ def main():
         help='Model identifier (default: Qwen/Qwen3-VL-8B-Instruct)'
     )
     parser.add_argument(
-        '--embeddings',
-        help='Read in the embeddings from a .pt file saved by save_embeddings.py'
+        '--cache',
+        help='Path to cached model state from save_embeddings.py'
     )
     parser.add_argument(
         '--max_new_tokens',
@@ -91,61 +95,98 @@ def main():
 
     logger.info('Model loaded successfully')
 
-    # Load image inputs if provided
-    image_inputs = {}
-    if args.embeddings:
-        logger.info('Loading image inputs from: %s', args.embeddings)
+    # Load cached state if provided
+    past_key_values = None
+    cached_input_ids = None
+    cached_attention_mask = None
+    cache_info = ""
+    
+    if args.cache:
+        logger.info('Loading cached model state from: %s', args.cache)
         try:
-            embeddings_data = torch.load(args.embeddings, map_location=device)
+            cache_data = torch.load(args.cache, map_location=device)
             
-            # Try new format first (image_inputs), fall back to old format (image_embeds)
-            if 'image_inputs' in embeddings_data:
-                image_inputs = embeddings_data['image_inputs']
-                logger.info('Loaded image_inputs with keys: %s', list(image_inputs.keys()))
-            elif 'image_embeds' in embeddings_data:
-                # Old format - this won't work with generate() but log it
-                logger.warning('Old embeddings format detected. Please regenerate with save_embeddings.py')
-                logger.warning('The old format cannot be used directly with generate()')
-                image_inputs = {}
+            past_key_values = cache_data.get('past_key_values')
+            cached_input_ids = cache_data.get('input_ids')
+            cached_attention_mask = cache_data.get('attention_mask')
             
-            # Move all tensors to device
-            image_inputs = {k: v.to(device) if hasattr(v, 'to') else v 
-                           for k, v in image_inputs.items()}
+            cached_model = cache_data.get('model_name', 'unknown')
+            cached_system = cache_data.get('system_prompt', '')
+            cached_image = cache_data.get('image_path', 'unknown')
             
-            saved_text = embeddings_data.get('text', '')
-            logger.info('Loaded with saved text: %s', saved_text)
+            if past_key_values:
+                # Move KV cache to device
+                past_key_values = tuple(
+                    tuple(t.to(device) if hasattr(t, 'to') else t for t in layer)
+                    for layer in past_key_values
+                )
+                
+            if cached_input_ids is not None:
+                cached_input_ids = cached_input_ids.to(device)
+            if cached_attention_mask is not None:
+                cached_attention_mask = cached_attention_mask.to(device)
             
-            # Log shapes
-            for k, v in image_inputs.items():
-                if hasattr(v, 'shape'):
-                    logger.info('  %s shape: %s', k, v.shape)
+            logger.info('Loaded cache for model: %s', cached_model)
+            logger.info('Cached image: %s', cached_image)
+            logger.info('System prompt: %s', cached_system)
+            logger.info('KV cache layers: %d', len(past_key_values) if past_key_values else 0)
+            logger.info('Cached input length: %d tokens', cached_input_ids.shape[1] if cached_input_ids is not None else 0)
+            
+            cache_info = f"[Using cached image: {os.path.basename(cached_image)}]"
+            
         except Exception as e:
-            logger.error('Failed to load embeddings file.')
+            logger.error('Failed to load cache file.')
             logger.exception(e)
             raise
 
     # Process the prompt using chat format
     logger.info('Processing prompt: %s', args.prompt)
     try:
-        # Create messages in chat format
-        messages = [
-            {"role": "user", "content": args.prompt}
-        ]
-        
-        # Apply chat template
-        text = processor.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        
-        # Process the formatted chat text
-        text_inputs = processor(
-            text=text,
-            return_tensors='pt'
-        )
-        # Move inputs to the correct device
-        text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+        if past_key_values is not None:
+            # We have cached state - just tokenize the new prompt
+            # Create a follow-up message
+            messages = [
+                {"role": "user", "content": args.prompt}
+            ]
+            
+            text = processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            
+            # Tokenize just the new prompt
+            new_inputs = processor(
+                text=text,
+                return_tensors='pt'
+            )
+            new_inputs = {k: v.to(device) for k, v in new_inputs.items()}
+            
+            # Concatenate with cached inputs
+            text_inputs = {
+                'input_ids': torch.cat([cached_input_ids, new_inputs['input_ids']], dim=1),
+                'attention_mask': torch.cat([cached_attention_mask, new_inputs['attention_mask']], dim=1)
+            }
+            
+            logger.info('Using cached state + new prompt (%d cached + %d new tokens)',
+                       cached_input_ids.shape[1], new_inputs['input_ids'].shape[1])
+        else:
+            # No cache - process normally
+            messages = [
+                {"role": "user", "content": args.prompt}
+            ]
+            
+            text = processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            
+            text_inputs = processor(
+                text=text,
+                return_tensors='pt'
+            )
+            text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
     except Exception as e:
         logger.error('Failed to process prompt.')
         logger.exception(e)
@@ -160,15 +201,16 @@ def main():
 
     try:
         with torch.no_grad():
-            # Prepare generate arguments - merge text and image inputs
+            # Prepare generate arguments
             generate_kwargs = {
                 **text_inputs,
-                **image_inputs,  # Add image inputs (pixel_values, etc.)
                 'generation_config': gen_config
             }
             
-            if image_inputs:
-                logger.info('Generating with image inputs: %s', list(image_inputs.keys()))
+            # Add cached KV if available
+            if past_key_values is not None:
+                generate_kwargs['past_key_values'] = past_key_values
+                logger.info('Generating with KV cache (%d layers)', len(past_key_values))
             
             output_ids = model.generate(**generate_kwargs)
     except Exception as e:
@@ -201,6 +243,8 @@ def main():
 
     # Print results
     print('\n' + '='*60)
+    if cache_info:
+        print(cache_info)
     print('PROMPT')
     print('='*60)
     print(args.prompt)
