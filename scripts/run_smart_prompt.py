@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a basic AI prompt using the Qwen3-VL-2B-Instruct model.
+"""Run a basic AI prompt using the Qwen3-VL-8B-Instruct model.
 
 This script loads the Qwen3V model and processor, then runs a user-provided
 prompt and generates text output using PyTorch.
