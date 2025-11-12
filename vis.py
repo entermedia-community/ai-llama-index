@@ -32,4 +32,4 @@ generated_ids = model.generate(**inputs)
 print(generated_ids)
 print(type(generated_ids))
 
-torch.save(inputs, "inputs.pt")
+torch.save(generated_ids, "generated_ids.pt")
