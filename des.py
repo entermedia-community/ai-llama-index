@@ -13,18 +13,5 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(
 
 precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device)
 
-# Option 1: Create a new prompt and reprocess with the same image
-new_messages = [
-    {"role": "user", "content": [
-        {"type": "image", "image": "file:///workspace/ai-create-embeddings/fordcasepage3.png"}, 
-        {"type": "text", "text": "What objects are visible in this image?"}  # Modified prompt
-    ]}
-]
-
-from qwen_vl_utils import process_vision_info
-new_text = processor.apply_chat_template(new_messages, tokenize=False, add_generation_prompt=True)
-images, _ = process_vision_info(new_messages, image_patch_size=16)
-modified_inputs = processor(text=new_text, images=images, return_tensors="pt").to(model.device)
-
-output = model.generate(**modified_inputs)
+output = model.generate(**precomputed_inputs)
 print(processor.batch_decode(output, skip_special_tokens=True))
