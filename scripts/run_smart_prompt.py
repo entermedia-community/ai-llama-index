@@ -33,7 +33,7 @@ def main():
         default='Qwen/Qwen3-VL-8B-Instruct',
         help='Model identifier (default: Qwen/Qwen3-VL-8B-Instruct)'
     )
-     parser.add_argument(
+    parser.add_argument(
         '--embeddings',
         help='Read in the embeddings from a .pt file saved by save_embeddings.py'
     )
