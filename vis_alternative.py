@@ -20,3 +20,5 @@ inputs = inputs.to(model.device)
 torch.save(inputs, "inputs-alt.pt")
 
 print(model.device)
+
+print(inputs.keys())
