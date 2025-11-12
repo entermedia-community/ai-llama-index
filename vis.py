@@ -28,5 +28,6 @@ inputs = inputs.to(model.device)
 print(inputs)
 print(type(inputs))
 
-output = model.generate(**inputs)
-print(processor.batch_decode(output, skip_special_tokens=True))
+torch.save(inputs, "inputs.pt")
+# output = model.generate(**inputs)
+# print(processor.batch_decode(output, skip_special_tokens=True))

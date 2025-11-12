@@ -10,32 +10,7 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(
     torch_dtype=torch.float16
 )
 
-# Load precomputed visual features
-precomputed_features = torch.load("inputs.pt", weights_only=False).to(model.device)
+precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device)
 
-# Example: Inject features into the model’s processing
-def generate_with_cached_features(prompt, visual_features):
-    
-    text_inputs = processor(text=prompt, return_tensors="pt").to(model.device)
-    inputs_embeds = model.get_input_embeddings()(text_inputs["input_ids"])
-    
-    combined_embeds = torch.cat([visual_features, inputs_embeds], dim=1)
-
-    outputs = model.generate(
-        inputs_embeds=combined_embeds,
-        max_new_tokens=100
-    )
-    return outputs
-
-print(precomputed_features.keys())
-
-prompt = "Describe this image."
-# output = generate_with_cached_features(prompt, precomputed_features['input_ids'])
-outputs = model.generate(
-    inputs_embeds=precomputed_features,
-    max_new_tokens=100
-)
-print(outputs)
-print(type(outputs))
-
-print(processor.decode(outputs[0], skip_special_tokens=True))
+output = model.generate(**precomputed_inputs)
+print(processor.batch_decode(output, skip_special_tokens=True))
