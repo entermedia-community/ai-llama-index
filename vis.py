@@ -18,8 +18,8 @@ images,_ = process_vision_info(messages, image_patch_size=16)
 print(images)
 print(type(images))
 
-# inputs = processor(text=text, images=images, return_tensors="pt")
-# inputs = inputs.to(model.device)
+inputs = processor(text=text, images=images, return_tensors="pt")
+inputs = inputs.to(model.device)
 
-# generated_ids = model.generate(**inputs)
-# print(generated_ids)
+generated_ids = model.generate(**inputs)
+print(generated_ids)
