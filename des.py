@@ -15,7 +15,7 @@ precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device
 
 print(model.device)
 
-output = model.generate(**precomputed_inputs, max_new_tokens=200, eos_token_id=None)
+output = model.generate(**precomputed_inputs, eos_token_id=None)
 decoded_output = processor.batch_decode(output, skip_special_tokens=True)
 for i, text in enumerate(decoded_output):
     print(f"Output {i}:")
