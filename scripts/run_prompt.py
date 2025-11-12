@@ -106,10 +106,10 @@ def main():
         with torch.no_grad():
             output_ids = model.generate(
                 **text_inputs,
-                max_new_tokens=args.max_new_tokens,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9
+               # max_new_tokens=args.max_new_tokens,
+                #do_sample=True,
+                #temperature=0.7,
+                #top_p=0.9
             )
     except Exception as e:
         logger.error('Failed during model.generate().')
