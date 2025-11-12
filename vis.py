@@ -4,7 +4,7 @@ from qwen_vl_utils import process_vision_info
 model_path = "Qwen/Qwen3-VL-8B-Instruct"
 # You can directly insert a local file path, a URL, or a base64-encoded image into the position where you want in the text.
 messages = [
-    [{"role": "user", "content": [{"type": "image", "image": "../fordcasepage3.png"}, {"type": "text", "text": "Describe this image."}]}],
+    [{"role": "user", "content": [{"type": "image", "image": "./fordcasepage3.png"}, {"type": "text", "text": "Describe this image."}]}],
 ]
 
 processor = AutoProcessor.from_pretrained(model_path)
