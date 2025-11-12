@@ -15,10 +15,7 @@ precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device
 
 # Option 2: Reuse image data but create new text prompt
 new_messages = [
-    {"role": "user", "content": [
-        {"type": "image", "image": "file:///workspace/ai-create-embeddings/fordcasepage3.png"}, 
-        {"type": "text", "text": "List all the text you can see in this image."}  # New prompt
-    ]}
+    [{"role": "user", "content": [{"type": "image", "image": "file:///workspace/ai-create-embeddings/fordcasepage3.png"}, {"type": "text", "text": "Extract the text from the image."}]}],
 ]
 
 # Create new text prompt while reusing the pixel_values from precomputed_inputs
