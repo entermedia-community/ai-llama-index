@@ -28,8 +28,5 @@ inputs = inputs.to(model.device)
 print(inputs)
 print(type(inputs))
 
-generated_ids = model.generate(**inputs)
-print(generated_ids)
-print(type(generated_ids))
-
-torch.save(generated_ids, "generated_ids.pt")
+output = model.generate(**inputs)
+print(processor.batch_decode(output, skip_special_tokens=True))
