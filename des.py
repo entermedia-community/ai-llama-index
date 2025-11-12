@@ -13,25 +13,5 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(
 
 precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device)
 
-
-messages = [
-    [{"role": "user", "content": [{"type": "text", "text": "Extract text from the image."}]}],
-]
-
-text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
-print(text)
-
-print(list(precomputed_inputs.keys()))
-print(list(text_inputs.keys()))
-
-print(text_inputs.get("attention_mask"))
-print(precomputed_inputs.get("attention_mask"))
-
-output = model.generate(
-  input_ids=text_inputs.get("input_ids"),
-  # attention_mask=text_inputs.get("attention_mask"),
-  pixel_values=precomputed_inputs.get("pixel_values"),
-  image_grid_thw=precomputed_inputs.get("image_grid_thw")
-)
+output = model.generate(**precomputed_inputs)
 print(processor.batch_decode(output, skip_special_tokens=True))
