@@ -62,7 +62,7 @@ def main():
 
     # Import transformers
     try:
-        from transformers import Qwen3VLForConditionalGeneration, Qwen3VLProcessor
+        from transformers import Qwen3VLForConditionalGeneration, Qwen3VLProcessor, GenerationConfig
     except Exception as e:
         logger.error(
             'Failed to import Qwen3V classes from transformers. '
@@ -100,21 +100,20 @@ def main():
         logger.exception(e)
         raise
 
-    # Generate output
     logger.info('Generating text with max_new_tokens=%d', args.max_new_tokens)
+
+    gen_config = GenerationConfig.from_pretrained(args.model)
+    gen_config.temperature = 0.5
+    gen_config.top_p = 0.9
+    gen_config.top_k = 50
+    gen_config.do_sample = True
+    gen_config.max_new_tokens = args.max_new_tokens
+
     try:
         with torch.no_grad():
             output_ids = model.generate(
                 **text_inputs,
-                do_sample=False,          # disable random sampling
-                #num_beams=5,              # beam search
-                temperature=0.5,          # less randomness
-                max_new_tokens=100,
-                #repetition_penalty=1.2
-                # max_new_tokens=args.max_new_tokens,
-                #do_sample=True,
-                #temperature=0.7,
-                #top_p=0.9
+                generation_config=gen_config
             )
     except Exception as e:
         logger.error('Failed during model.generate().')
