@@ -13,6 +13,9 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(
 precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device)
 text_inputs = processor(text="Extract the text from the image.", return_tensors="pt").to(model.device)
 
+print(type(precomputed_inputs))
+print(type(text_inputs))
+
 output = model.generate(torch.cat((precomputed_inputs, text_inputs), dim=1))
 print(processor.batch_decode(output, skip_special_tokens=True))
 
