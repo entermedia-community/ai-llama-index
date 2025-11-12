@@ -1,6 +1,5 @@
 import torch
 from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
-from transformers.feature_extraction_utils import BatchFeature
 
 # Load model and processor
 model_name = "Qwen/Qwen3-VL-8B-Instruct"
@@ -15,7 +14,7 @@ precomputed_inputs = torch.load("inputs.pt", weights_only=False).to(model.device
 
 print(model.device)
 
-output = model.generate(**precomputed_inputs, max_new_tokens=200)
+output = model.generate(**precomputed_inputs)
 decoded_output = processor.batch_decode(output, skip_special_tokens=True)
 for i, text in enumerate(decoded_output):
     print(f"Output {i}:")
