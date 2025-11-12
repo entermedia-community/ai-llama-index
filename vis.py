@@ -15,6 +15,9 @@ model = Qwen3VLForConditionalGeneration.from_pretrained(model_path, dtype="auto"
 text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 images = process_vision_info(messages, image_patch_size=16)
 
+print(images)
+print(type(images))
+
 inputs = processor(text=text, images=images, return_tensors="pt")
 inputs = inputs.to(model.device)
 
