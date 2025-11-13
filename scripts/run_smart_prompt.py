@@ -95,61 +95,31 @@ def main():
 
     logger.info('Model loaded successfully')
 
-    # Load cached state if provided
-    past_key_values = None
-    cached_input_ids = None
-    cached_attention_mask = None
+    # Load processed image inputs if provided
+    image_inputs = {}
     cache_info = ""
     
     if args.cache:
-        logger.info('Loading cached model state from: %s', args.cache)
+        logger.info('Loading processed image from: %s', args.cache)
         try:
             # Use weights_only=False for cache files containing transformers objects
             # This is safe since we created the cache file ourselves
             cache_data = torch.load(args.cache, map_location=device, weights_only=False)
             
-            past_key_values = cache_data.get('past_key_values')
-            cached_input_ids = cache_data.get('input_ids')
-            cached_attention_mask = cache_data.get('attention_mask')
-            
-            cached_model = cache_data.get('model_name', 'unknown')
-            cached_system = cache_data.get('system_prompt', '')
+            image_inputs = cache_data.get('image_inputs', {})
             cached_image = cache_data.get('image_path', 'unknown')
             
-            if past_key_values:
-                # Convert tuple to Cache instance for newer transformers
-                try:
-                    from transformers import DynamicCache
-                    if isinstance(past_key_values, tuple):
-                        logger.info('Converting tuple past_key_values to DynamicCache instance')
-                        cache = DynamicCache()
-                        # Import the key_values into the cache
-                        for layer_idx, (key, value) in enumerate(past_key_values):
-                            cache.update(key.to(device), value.to(device), layer_idx)
-                        past_key_values = cache
-                    else:
-                        # Already a Cache instance, just move to device
-                        past_key_values = past_key_values.to(device) if hasattr(past_key_values, 'to') else past_key_values
-                except ImportError:
-                    logger.warning('DynamicCache not available, keeping as tuple (may not work with newer transformers)')
-                    # Move tuple elements to device
-                    past_key_values = tuple(
-                        tuple(t.to(device) if hasattr(t, 'to') else t for t in layer)
-                        for layer in past_key_values
-                    )
-                
-            if cached_input_ids is not None:
-                cached_input_ids = cached_input_ids.to(device)
-            if cached_attention_mask is not None:
-                cached_attention_mask = cached_attention_mask.to(device)
+            # Move tensors to device
+            image_inputs = {k: v.to(device) if hasattr(v, 'to') else v 
+                           for k, v in image_inputs.items()}
             
-            logger.info('Loaded cache for model: %s', cached_model)
-            logger.info('Cached image: %s', cached_image)
-            logger.info('System prompt: %s', cached_system)
-            logger.info('KV cache layers: %d', len(past_key_values) if past_key_values else 0)
-            logger.info('Cached input length: %d tokens', cached_input_ids.shape[1] if cached_input_ids is not None else 0)
+            logger.info('Loaded image: %s', cached_image)
+            logger.info('Image input keys: %s', list(image_inputs.keys()))
+            for k, v in image_inputs.items():
+                if hasattr(v, 'shape'):
+                    logger.info('  %s shape: %s', k, v.shape)
             
-            cache_info = f"[Using cached image: {os.path.basename(cached_image)}]"
+            cache_info = f"[Image: {os.path.basename(cached_image)}]"
             
         except Exception as e:
             logger.error('Failed to load cache file.')
@@ -159,44 +129,48 @@ def main():
     # Process the prompt using chat format
     logger.info('Processing prompt: %s', args.prompt)
     try:
-        if past_key_values is not None:
-            # We have cached state - just tokenize the new prompt
-            # Don't concatenate with cached tokens - the KV cache handles that
+        if image_inputs:
+            # We have image - create multimodal message
+            messages = [
+                {
+                    "role": "user",
+                    "content": args.prompt  # Just text, image will be added separately
+                }
+            ]
+        else:
+            # Text-only message
             messages = [
                 {"role": "user", "content": args.prompt}
             ]
-            
-            text = processor.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
-            
-            # Tokenize just the new prompt
+        
+        text = processor.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
+        # Process text (and image if available)
+        if image_inputs:
+            # Combine text with cached image inputs
             text_inputs = processor(
                 text=text,
                 return_tensors='pt'
             )
             text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
-            
-            logger.info('Using cached KV state with new prompt (%d cached tokens in KV cache, %d new tokens)',
-                       cached_input_ids.shape[1], text_inputs['input_ids'].shape[1])
+            # Merge with image inputs
+            text_inputs.update(image_inputs)
+            logger.info('Using cached image with new prompt')
         else:
-            # No cache - process normally
-            messages = [
-                {"role": "user", "content": args.prompt}
-            ]
-            
-            text = processor.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
-            
+            # Text only
             text_inputs = processor(
                 text=text,
                 return_tensors='pt'
             )
+            text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
+    except Exception as e:
+        logger.error('Failed to process prompt.')
+        logger.exception(e)
+        raise
             text_inputs = {k: v.to(device) for k, v in text_inputs.items()}
     except Exception as e:
         logger.error('Failed to process prompt.')
@@ -217,11 +191,6 @@ def main():
                 **text_inputs,
                 'generation_config': gen_config
             }
-            
-            # Add cached KV if available
-            if past_key_values is not None:
-                generate_kwargs['past_key_values'] = past_key_values
-                logger.info('Generating with KV cache (%d layers)', len(past_key_values))
             
             output_ids = model.generate(**generate_kwargs)
     except Exception as e:
