@@ -1,2 +1,3 @@
-faiss_storage
-storage
+.venv
+qdrant_db
+__pycache__
