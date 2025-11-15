@@ -10,7 +10,8 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from qdrant_client import QdrantClient
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.vector_stores import (
-    MetadataFilter, 
+    MetadataFilter,
+    MetadataFilters,
     FilterOperator,
 )
 
@@ -102,18 +103,14 @@ class QueryDocsRequest(BaseModel):
 
 @app.post("/query/")
 async def query_docs(data: QueryDocsRequest):
-    # filters = MetadataFilters(
-    #     filters=[
-    #         MetadataFilter(key="id", operator=FilterOperator.IN, value=data.doc_ids)
-    #     ]
-    # )
-
-    query_engine = index.as_query_engine(
+    filters = MetadataFilters(
         filters=[
             MetadataFilter(key="id", operator=FilterOperator.IN, value=data.doc_ids)
         ]
     )
 
-    response = query_engine.query(data.query)
+    retriever = index.as_retriever(filters=filters)
+
+    response = retriever.retrieve(data.query)
     return str(response)
 
