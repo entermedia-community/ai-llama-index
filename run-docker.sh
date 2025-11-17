@@ -1,0 +1,1 @@
+sudo docker run --name llama-index llama-index > /dev/null 2>&1
