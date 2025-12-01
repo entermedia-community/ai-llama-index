@@ -1,0 +1,1 @@
+sudo docker run -d --name documentembedding -v qdrant_db:/app/db documentembedding

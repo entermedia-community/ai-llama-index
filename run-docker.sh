@@ -1,1 +1,0 @@
-sudo docker run -d --name llama-index -v qdrant_db:/app/db llama-index
