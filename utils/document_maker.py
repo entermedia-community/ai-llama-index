@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
-from typing import Optional, Required
+from typing import Optional
 from llama_index.core import Document
 
 @dataclass
 class DocumentMaker:
   """Creates Document objects with consistent metadata."""
   
-  id: Required[str] = field(metadata={"description": "Unique identifier for the document"})
-  parent_id: Required[str] = field(metadata={"description": "Identifier for the parent document"})
+  id: str = field(metadata={"description": "Unique identifier for the document"})
+  parent_id: str = field(metadata={"description": "Identifier for the parent document"})
   page_label: Optional[str] = None
   file_name: Optional[str] = None
   file_type: Optional[str] = None
