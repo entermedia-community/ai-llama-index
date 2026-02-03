@@ -1,15 +1,9 @@
 cachetools
 fastapi[standard]
-fastembed
 llama-cpp-python
 llama-index
 llama-index-embeddings-huggingface
-llama-index-llms-llama-cpp
-llama-index-llms-ollama
 llama-index-llms-openai-like
-llama-index-readers-file
-llama-index-utils-workflow
 llama-index-vector-stores-milvus
-nest-asyncio
 pymilvus
 uvicorn
