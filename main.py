@@ -2,7 +2,7 @@ from typing import Optional
 import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 from typing import List, Optional
 from fastapi import FastAPI, status, Header, Depends
