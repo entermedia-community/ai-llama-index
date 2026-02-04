@@ -1,6 +1,7 @@
 from pymilvus import MilvusClient
 
-MILVUS_URI = "http://mediadb45.entermediadb.net:19530"
+# MILVUS_URI = "http://mediadb45.entermediadb.net:19530"
+MILVUS_URI = "./mil.db"
 COLLECTION_NAME = "client_demo_embeddings"
 
 client = MilvusClient(uri=MILVUS_URI)
