@@ -7,6 +7,7 @@ client = MilvusClient(uri=MILVUS_URI)
 res = client.query(
   collection_name=COLLECTION_NAME,
   limit=10,
+  output_fields=["parent_id", "text"],
 )
 
 print(res)
