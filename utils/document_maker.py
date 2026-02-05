@@ -29,4 +29,4 @@ class DocumentMaker:
     """Creates a Document with the current metadata."""
     if not text:
       raise ValueError("Document text cannot be empty")
-    return Document(text=text, metadata=self.get_metadata())
+    return Document(text=text, id_=self.id, metadata=self.get_metadata())

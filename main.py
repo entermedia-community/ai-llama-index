@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import FastAPI, status, Header, Depends
 from fastapi.responses import JSONResponse
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from llama_index.core import Settings
 from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 from llama_index.core.vector_stores import (
@@ -51,16 +51,16 @@ async def root():
     return {"message": "Running AI Embedding Service"}
 
 class CreateEmbeddingData(BaseModel):
-    page_id: str
-    text: str
-    page_label: str | None = None
+    page_id: str = Field(..., min_length=1, description="The page ID.")
+    text: str = Field(..., min_length=1, description="The text content of the page.")
+    page_label: str | None = Field(None, description="The label of the page.")
 
 class CreateEmbeddingRequest(BaseModel):
-    doc_id: str
-    file_name: str
-    file_type: str | None = None
-    creation_date: str | None = None
-    pages: List[CreateEmbeddingData]
+    doc_id: str = Field(..., min_length=1, description="The document ID.")
+    file_name: str | None = Field(None, description="The file name.")
+    file_type: str | None = Field(None, description="The file type.")
+    creation_date: str | None = Field(None, description="The creation date.")
+    pages: List[CreateEmbeddingData] = Field(..., min_length=1, description="List of pages to embed.")
 
 @app.post("/save")
 async def embed_document(
@@ -137,8 +137,8 @@ async def embed_document(
     )
     
 class QueryDocsRequest(BaseModel):
-    query: str
-    parent_ids: list[str]
+    query: str = Field(..., min_length=5, description="The query string.")
+    parent_ids: List[str] = Field(..., min_length=1, description="List of parent document IDs to filter by.")
 
 @app.post("/query")
 async def query_docs(
@@ -149,9 +149,16 @@ async def query_docs(
     index = registry.get(collection_name=x_customerkey)
 
     try:
+        if(len(data.parent_ids) == 1):
+            operator = FilterOperator.EQ
+            value = data.parent_ids[0]
+        else:
+            operator = FilterOperator.IN
+            value = data.parent_ids
+        
         filters = MetadataFilters(
             filters=[
-                MetadataFilter(key="parent_id", operator=FilterOperator.IN, value=data.parent_ids)
+                MetadataFilter(key="parent_id", operator=operator, value=value)
             ]
         )
 
@@ -179,33 +186,25 @@ async def query_docs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": str(e)}
         )
-
-class DeleteDocsRequest(BaseModel):
-    doc_id: str
-
-@app.post("/delete")
-async def delete_by_doc_id(
-    doc: DeleteDocsRequest,
-    x_customerkey: Optional[str] = Depends(get_collection_name)
-):
     
-    index = registry.get(collection_name=x_customerkey)
+# class DeleteDocsRequest(BaseModel):
+#     page_ids: str = Field(..., min_length=1, description="The page IDs to delete.")
 
-    filters = MetadataFilters(
-        filters=[
-            MetadataFilter(key="parent_id", operator=FilterOperator.EQ, value=doc.doc_id)
-        ]
-    )
-
-    try:
-        index.delete(filters=filters)
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"message": f"Documents with doc_id {doc.doc_id} deleted successfully."}
-        )
-    except Exception as e:
-        print("Error during deletion:", str(e))
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": str(e)}
-        )
+# @app.post("/delete-pages")
+# async def delete_by_doc_id(
+#     doc: DeleteDocsRequest,
+#     x_customerkey: Optional[str] = Depends(get_collection_name)
+# ):
+#     index = registry.get(collection_name=x_customerkey)
+#     try:
+#         index.delete_ref_doc(doc.page_ids, delete_from_docstore=True)
+#         return JSONResponse(
+#             status_code=status.HTTP_200_OK,
+#             content={"message": f"Documents with page_ids {doc.page_ids} deleted successfully."}
+#         )
+#     except Exception as e:
+#         print("Error during deletion:", str(e))
+#         return JSONResponse(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             content={"error": str(e)}
+#         )
