@@ -31,7 +31,7 @@ class IndexRegistry:
 
     with self._lock:        
       if key not in self._collections:
-        client = QdrantClient(host="mediadb45.entermediadb.net", port=6333)
+        client = QdrantClient(host="localhost", port=6333)
         if not client.collection_exists(collection_name=collection_name):
           client.create_collection(
             collection_name=collection_name,
