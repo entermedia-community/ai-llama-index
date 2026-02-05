@@ -31,7 +31,7 @@ class IndexRegistry:
 
     with self._lock:        
       if key not in self._collections:
-        client = QdrantClient(host="142.127.68.223", port=15209)
+        client = QdrantClient(host="142.127.68.223", port=15269)
         if not client.collection_exists(collection_name=collection_name):
           client.create_collection(
             collection_name=collection_name,
