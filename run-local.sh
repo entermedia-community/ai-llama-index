@@ -1,1 +1,1 @@
-uvicorn main:app --host 0.0.0.0 --port 9600 --workers 1 &
+uv run uvicorn main:app --port 8000
