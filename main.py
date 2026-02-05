@@ -3,6 +3,7 @@ import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["HF_HOME"] = os.path.expanduser("~/models")
 
 from typing import List, Optional
 from fastapi import FastAPI, status, Header, Depends
