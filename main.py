@@ -36,7 +36,8 @@ llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 callback_manager = CallbackManager([llama_debug])
 
 llm = OpenAILike(
-    api_base="http://0.0.0.0:7600/",
+    api_base="http://0.0.0.0:7600/", # Server uses local LLM
+    # api_base="https://llamat.emediaworkspace.com/", # Use this for testing locally with the remote LLM
     is_chat_model=True,
     is_function_calling_model=True
 )
