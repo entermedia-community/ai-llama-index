@@ -1,4 +1,5 @@
 from typing import Optional, List
+import logging
 import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -29,6 +30,8 @@ from utils.document_maker import DocumentMaker
 from db_manager import IndexRegistry
 
 app = FastAPI()
+
+logger = logging.getLogger(__name__)
 
 registry = IndexRegistry(dim=1024)
 
@@ -126,6 +129,7 @@ async def embed_document(
             print("Added page ID:", page_id)
         except Exception as e:
             failed.add(page_id)
+            logger.error(f"Error embedding page {page_id} of document {doc_id}: {str(e)}")
     
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -180,7 +184,7 @@ async def query_docs(
             }
         )
     except Exception as e:
-        print("Error during query:", str(e))
+        logger.error("Error during query_docs: " + str(e))
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": str(e)}
@@ -225,7 +229,7 @@ async def create_outline(
         )
 
     except Exception as e:
-        print("Error during query:", str(e))
+        logger.error("Error during create_outline: " + str(e))
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": str(e)}
@@ -267,7 +271,7 @@ async def create_section_contents(
         )
 
     except Exception as e:
-        print("Error during query:", str(e))
+        logger.error("Error during create_section_contents: " + str(e))
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": str(e)}
