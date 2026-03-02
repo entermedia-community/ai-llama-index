@@ -1,5 +1,6 @@
 cachetools
 fastapi[standard]
+ninja
 llama-cpp-python
 llama-index
 llama-index-embeddings-huggingface
