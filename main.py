@@ -68,9 +68,8 @@ class IndexRegistry:
     with self._lock:        
       if key not in self._collections:
         client = QdrantClient(
-            host="localhost",
+            host="0.0.0.0",
             port=6333,
-            timeout=20.0,
             # host="74.48.140.178", 
             # port=27054
         )
