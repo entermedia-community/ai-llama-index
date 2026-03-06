@@ -9,10 +9,7 @@ from fastapi import FastAPI, status, Header, Depends
 from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel, Field
-from llama_index.core import Settings, PromptTemplate, get_response_synthesizer
-from llama_index.core.retrievers import BaseRetriever
-from llama_index.core.query_engine import CustomQueryEngine
-from llama_index.core.response_synthesizers import BaseSynthesizer
+from llama_index.core import Settings
 from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 
 from llama_index.llms.openai_like import OpenAILike
@@ -41,40 +38,17 @@ llm = OpenAILike(
     is_function_calling_model=True
 )
 
+class Outlines(BaseModel):
+    outline: List[str] = Field(..., description="List of outline sections extracted from the document.")
+
+s_llm = llm.as_structured_llm(output_cls=Outlines)
+
 Settings.llm = llm
 
 Settings.embed_model = HuggingFaceEmbedding(
-  model_name="BAAI/bge-m3"
+  model_name="intfloat/multilingual-e5-large",
+  device="cuda"
 )
-
-outline_prompt = PromptTemplate(
-    "Context information is below.\n"
-    "---------------------\n"
-    "{context_str}\n"
-    "---------------------\n"
-    "Given the context information and not prior knowledge, create a list of sections header following the instructions in query. Provide only the list no additional text.\n"
-    "Query: {query_str}\n"
-    "Answer: "
-)
-
-class RAGStringQueryEngine(CustomQueryEngine):
-    """RAG String Query Engine."""
-
-    retriever: BaseRetriever
-    response_synthesizer: BaseSynthesizer
-    llm: OpenAILike
-    qa_prompt: PromptTemplate
-
-    def custom_query(self, query_str: str):
-        nodes = self.retriever.retrieve(query_str)
-
-        context_str = "\n\n".join([n.node.get_content() for n in nodes])
-        response = self.llm.complete(
-            self.qa_prompt.format(context_str=context_str, query_str=query_str)
-        )
-
-        return str(response)
-
 
 def get_collection_name(x_customerkey: Optional[str] = Header(None)):
     if not x_customerkey.isalnum():
@@ -235,22 +209,13 @@ async def create_outline(
             ]
         )
 
-        retriever = index.as_retriever(vector_store_kwargs={"qdrant_filters": filters})
-
-        query_engine = RAGStringQueryEngine.from_args(
-            retriever=retriever,
-            response_synthesizer=get_response_synthesizer(),
-            llm=llm,
-            qa_prompt=outline_prompt,
-        )
-
-        # query_engine = index.as_query_engine(vector_store_kwargs={"qdrant_filters": filters})
+        query_engine = index.as_query_engine(vector_store_kwargs={"qdrant_filters": filters}, llm=s_llm)
 
         response = query_engine.query(data.query)
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"outline": str(response) }
+            content={"outline": response.outline}
         )
 
     except Exception as e:

@@ -12,7 +12,7 @@ from qdrant_client.models import Distance, VectorParams
 
 
 Settings.embed_model = HuggingFaceEmbedding(
-  model_name="BAAI/bge-m3"
+  model_name="intfloat/multilingual-e5-large"
 )
 
 class IndexRegistry:
