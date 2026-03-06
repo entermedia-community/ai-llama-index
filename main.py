@@ -201,23 +201,21 @@ async def create_outline(
 ):
     index = registry.get(collection_name=x_customerkey)
 
-    try:
-        if(len(data.parent_ids) == 1):
-            operator = FilterOperator.EQ
-            value = data.parent_ids[0]
-        else:
-            operator = FilterOperator.IN
-            value = data.parent_ids
-        
-        filters = MetadataFilters(
-            filters=[
-                MetadataFilter(key="parent_id", operator=operator, value=value)
+    try:        
+        filters = Filter(
+            must=[
+                FieldCondition(
+                    key="parent_id",
+                    match=MatchAny(
+                        any=data.parent_ids
+                    )
+                )
             ]
         )
 
         sllm = llm.as_structured_llm(output_cls=Outlines)
 
-        query_engine = index.as_query_engine(filters=filters, llm=sllm)
+        query_engine = index.as_query_engine(vector_store_kwargs={"qdrant_filters": filters}, llm=sllm)
 
         response = query_engine.query(data.query)
 
@@ -228,48 +226,6 @@ async def create_outline(
 
     except Exception as e:
         logger.error("Error during create_outline: " + str(e))
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": str(e)}
-        )
-
-class Paragraphs(BaseModel):
-    section_contents: List[str] = Field(..., description="List of content based on the query. Each item is a single paragraph.")
-
-@app.post("/create_section_contents")
-async def create_section_contents(
-    data: QueryDocsRequest,
-    x_customerkey: Optional[str] = Depends(get_collection_name)
-):
-    index = registry.get(collection_name=x_customerkey)
-
-    try:
-        if(len(data.parent_ids) == 1):
-            operator = FilterOperator.EQ
-            value = data.parent_ids[0]
-        else:
-            operator = FilterOperator.IN
-            value = data.parent_ids
-        
-        filters = MetadataFilters(
-            filters=[
-                MetadataFilter(key="parent_id", operator=operator, value=value)
-            ]
-        )
-
-        sllm = llm.as_structured_llm(output_cls=Paragraphs)
-
-        query_engine = index.as_query_engine(filters=filters, llm=sllm)
-
-        response = query_engine.query(data.query)
-
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"section_contents": response.section_contents}
-        )
-
-    except Exception as e:
-        logger.error("Error during create_section_contents: " + str(e))
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": str(e)}
