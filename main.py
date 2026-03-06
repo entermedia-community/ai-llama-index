@@ -30,6 +30,9 @@ from qdrant_client.models import Distance, VectorParams
 
 from utils.document_maker import DocumentMaker
 
+from fastapi.middleware.gzip import GZipMiddleware
+
+
 llm = OpenAILike(
     api_base="http://0.0.0.0:7600/", # Server uses local LLM
     # api_base="https://llamat.emediaworkspace.com/", # Use this for testing locally with the remote LLM
@@ -66,7 +69,8 @@ class IndexRegistry:
       if key not in self._collections:
         client = QdrantClient(
             host="localhost",
-            port=6333
+            port=6333,
+            timeout=20.0,
             # host="74.48.140.178", 
             # port=27054
         )
@@ -90,6 +94,10 @@ class IndexRegistry:
       return self._collections[key]
 
 app = FastAPI()
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=500, 
+)
 
 logger = logging.getLogger(__name__)
 
