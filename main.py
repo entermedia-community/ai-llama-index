@@ -1,15 +1,17 @@
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+import asyncio
 import json
+from functools import partial
 
 from typing import Optional, List
 import logging
 from threading import Lock
 from cachetools import LRUCache
 
-from typing import List, Optional
-from fastapi import FastAPI, status, Header, Depends
+from fastapi import FastAPI, status, Header, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel, Field
@@ -93,11 +95,22 @@ logger = logging.getLogger(__name__)
 
 registry = IndexRegistry(dim=1024)
 
+REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
+INDEX_TIMEOUT_SECONDS = int(os.getenv("INDEX_TIMEOUT_SECONDS", "30"))
+MAX_CONCURRENT_HEAVY_REQUESTS = int(os.getenv("MAX_CONCURRENT_HEAVY_REQUESTS", "4"))
+heavy_request_semaphore = asyncio.Semaphore(MAX_CONCURRENT_HEAVY_REQUESTS)
+
+
+async def run_blocking(func, *args, timeout: int = REQUEST_TIMEOUT_SECONDS, **kwargs):
+    """Run sync heavy tasks in a threadpool to keep the event loop responsive."""
+    bound_call = partial(func, *args, **kwargs)
+    return await asyncio.wait_for(run_in_threadpool(bound_call), timeout=timeout)
+
 
 
 def get_collection_name(x_customerkey: Optional[str] = Header(None)):
-    if not x_customerkey.isalnum():
-        raise ValueError("Invalid customer key.")
+    if not x_customerkey or not x_customerkey.isalnum():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid customer key.")
     return f'client_{x_customerkey}_embeddings'
 
 @app.get("/")
@@ -121,68 +134,80 @@ async def embed_document(
     all_data: CreateEmbeddingRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
-    
-    index = registry.get(collection_name=x_customerkey)
+    async with heavy_request_semaphore:
+        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
 
-    doc_id = all_data.doc_id
-    file_name = all_data.file_name
-    file_type = all_data.file_type
-    creation_date = all_data.creation_date
+        doc_id = all_data.doc_id
+        file_name = all_data.file_name
+        file_type = all_data.file_type
+        creation_date = all_data.creation_date
 
-    if not doc_id:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "Document ID is required."}
-        )
-    
-    processed = set()
-    failed = set()
-    skipped = set()
-    print("Adding pages for document ID:", doc_id)
-    for data in all_data.pages:
-        page_id = data.page_id
-        if not page_id:
+        if not doc_id:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"error": "Document ID is required."}
             )
 
-        index.delete(doc_id=page_id, delete_from_docstore=True)
-        
-        page_label = data.page_label
+        processed = set()
+        failed = set()
+        skipped = set()
+        logger.info("Adding pages for document ID: %s", doc_id)
+        for data in all_data.pages:
+            page_id = data.page_id
+            if not page_id:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={"error": "Document ID is required."}
+                )
 
-        text = data.text
+            await run_blocking(
+                index.delete,
+                doc_id=page_id,
+                delete_from_docstore=True,
+            )
+            page_label = data.page_label
+            text = data.text
 
-        if not text or text.strip() == "":
-            skipped.add(page_id)
-            continue
+            if not text or text.strip() == "":
+                skipped.add(page_id)
+                continue
 
-        doc_maker = DocumentMaker(
-            id=page_id,
-            parent_id=doc_id,
-            page_label=page_label,
-            file_name=file_name,
-            file_type=file_type,
-            creation_date=creation_date,
+            doc_maker = DocumentMaker(
+                id=page_id,
+                parent_id=doc_id,
+                page_label=page_label,
+                file_name=file_name,
+                file_type=file_type,
+                creation_date=creation_date,
+            )
+            try:
+                document = doc_maker.create_document(text)
+                await run_blocking(index.insert, document)
+                processed.add(page_id)
+
+                logger.info("Added page ID: %s", page_id)
+            except asyncio.TimeoutError:
+                raise
+            except Exception as e:
+                failed.add(page_id)
+                logger.error("Error embedding page %s of document %s: %s", page_id, doc_id, str(e))
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": f"Document {doc_id} embedded successfully.",
+                "processed": list(processed),
+                "skipped": list(skipped),
+                "failed": list(failed),
+            }
         )
-        try:
-            document = doc_maker.create_document(text)
-            index.insert(document)
-            processed.add(page_id)
 
-            print("Added page ID:", page_id)
-        except Exception as e:
-            failed.add(page_id)
-            logger.error(f"Error embedding page {page_id} of document {doc_id}: {str(e)}")
     
+@app.exception_handler(asyncio.TimeoutError)
+async def timeout_exception_handler(_, __):
     return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": f"Document {doc_id} embedded successfully.",
-            "processed": list(processed),
-            "skipped": list(skipped),
-            "failed": list(failed),
-        }
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        content={"error": "The operation timed out while waiting for model/vector-store response."},
     )
     
 class QueryDocsRequest(BaseModel):
@@ -194,45 +219,50 @@ async def query_docs(
     data: QueryDocsRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
-    
-    index = registry.get(collection_name=x_customerkey)
+    async with heavy_request_semaphore:
+        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
 
-    try:        
-        filters = Filter(
-            must=[
-                FieldCondition(
-                    key="parent_id",
-                    match=MatchAny(
-                        any=data.parent_ids
+        try:
+            filters = Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_id",
+                        match=MatchAny(
+                            any=data.parent_ids
+                        )
                     )
-                )
-            ]
-        )
+                ]
+            )
 
-        query_engine = index.as_query_engine(vector_store_kwargs={"qdrant_filters": filters})
-        
-        response = query_engine.query(data.query)
-        
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-            "query": data.query,
-            "answer": str(response),
-            "sources": [
-                {
-                    **node.node.metadata,
-                    "score": node.score,
+            query_engine = await run_blocking(
+                index.as_query_engine,
+                vector_store_kwargs={"qdrant_filters": filters},
+                timeout=INDEX_TIMEOUT_SECONDS,
+            )
+            response = await run_blocking(query_engine.query, data.query)
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                "query": data.query,
+                "answer": str(response),
+                "sources": [
+                    {
+                        **node.node.metadata,
+                        "score": node.score,
+                    }
+                    for node in response.source_nodes
+                ]
                 }
-                for node in response.source_nodes
-            ]
-            }
-        )
-    except Exception as e:
-        logger.error("Error during query_docs: " + str(e))
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": str(e)}
-        )
+            )
+        except asyncio.TimeoutError:
+            raise
+        except Exception as e:
+            logger.error("Error during query_docs: %s", str(e))
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": str(e)}
+            )
 
 SECTION_HEADERS_PROMPT = PromptTemplate(
     """You are a document structure expert. Given a context and a user query, 
@@ -265,47 +295,52 @@ async def create_outline(
     data: QueryDocsRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
-    index = registry.get(collection_name=x_customerkey)
+    async with heavy_request_semaphore:
+        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
 
-    try:        
-        filters = Filter(
-            must=[
-                FieldCondition(
-                    key="parent_id",
-                    match=MatchAny(
-                        any=data.parent_ids
+        try:
+            filters = Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_id",
+                        match=MatchAny(
+                            any=data.parent_ids
+                        )
                     )
-                )
-            ]
-        )
+                ]
+            )
 
-        retriever = index.as_retriever(vector_store_kwargs={"qdrant_filters": filters})
-        
-        nodes = retriever.retrieve(data.query)
-        context = "";
-        for node in nodes:
-            context += f"Page ID: {node.node.metadata.get('id', 'N/A')}, Page Label: {node.node.metadata.get('page_label', 'N/A')}\n"
-            context += f"Content: {node.node.get_content()}\n\n"
+            retriever = await run_blocking(
+                index.as_retriever,
+                vector_store_kwargs={"qdrant_filters": filters},
+                timeout=INDEX_TIMEOUT_SECONDS,
+            )
 
-        response = llm.predict(
-            SECTION_HEADERS_PROMPT,
-            context=context,
-            query=data.query
-        )
+            nodes = await run_blocking(retriever.retrieve, data.query)
+            context = ""
+            for node in nodes:
+                context += f"Page ID: {node.node.metadata.get('id', 'N/A')}, Page Label: {node.node.metadata.get('page_label', 'N/A')}\n"
+                context += f"Content: {node.node.get_content()}\n\n"
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"outline": json.loads(response)}
-        )
-    
+            response = await run_blocking(
+                llm.predict,
+                SECTION_HEADERS_PROMPT,
+                context=context,
+                query=data.query,
+            )
 
-
-    except Exception as e:
-        logger.error("Error during create_outline: " + str(e))
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": str(e)}
-        )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"outline": json.loads(response)}
+            )
+        except asyncio.TimeoutError:
+            raise
+        except Exception as e:
+            logger.error("Error during create_outline: %s", str(e))
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": str(e)}
+            )
     
 class DeleteDocsRequest(BaseModel):
     node_ids: List[str] = Field(..., description="List of node IDs to delete.")
@@ -315,10 +350,11 @@ async def delete_document(
     data: DeleteDocsRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
-    index = registry.get(collection_name=x_customerkey)
+    async with heavy_request_semaphore:
+        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
 
-    for node_id in data.node_ids:
-        index.delete(doc_id=node_id, delete_from_docstore=True)
+        for node_id in data.node_ids:
+            await run_blocking(index.delete, doc_id=node_id, delete_from_docstore=True)
     
     return JSONResponse(
         status_code=status.HTTP_200_OK,
