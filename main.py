@@ -3,12 +3,11 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import asyncio
 import json
-from functools import partial
+from functools import partial, lru_cache
 
 from typing import Optional, List
 import logging
 from threading import Lock
-from cachetools import LRUCache
 
 from fastapi import FastAPI, status, Header, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -51,46 +50,29 @@ Settings.embed_model = HuggingFaceEmbedding(
   model_name="BAAI/bge-m3"
 )
 
-class IndexRegistry:
-  def __init__(
-    self,
-    dim: int = 1024,
-    max_cache_size: int = 5
-  ):
-    self.dim = dim
-    self._lock = Lock()
+client = QdrantClient(
+    host="localhost",
+    port=6333,
+    # host="74.48.140.178", 
+    # port=27054
+)
 
-    self._collections = LRUCache(maxsize=max_cache_size)
+VECTOR_SIZE = 1024
 
-  def get(self, collection_name: str) -> VectorStoreIndex:
-    key = collection_name
-
-    with self._lock:        
-      if key not in self._collections:
-        client = QdrantClient(
-            host="0.0.0.0",
-            port=6333,
-            # host="74.48.140.178", 
-            # port=27054
+def ensure_collection(name: str):
+    existing = [c.name for c in client.get_collections().collections]
+    if name not in existing:
+        client.create_collection(
+            collection_name=name,
+            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
         )
-        if not client.collection_exists(collection_name=collection_name):
-          client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(
-              size=self.dim,
-              distance=Distance.COSINE
-            )
-          )
-        vector_store = QdrantVectorStore(
-          client=client,
-          collection_name=collection_name,
-        )
-        
-        index = VectorStoreIndex.from_vector_store(vector_store)
 
-        self._collections[key] = index
+@lru_cache(maxsize=32)
+def get_vector_store(collection: str) -> QdrantVectorStore:
+    ensure_collection(collection)
+    return QdrantVectorStore(client=client, collection_name=collection)
 
-      return self._collections[key]
+
 
 app = FastAPI()
 app.add_middleware(
@@ -99,8 +81,6 @@ app.add_middleware(
 )
 
 logger = logging.getLogger(__name__)
-
-registry = IndexRegistry(dim=1024)
 
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
 INDEX_TIMEOUT_SECONDS = int(os.getenv("INDEX_TIMEOUT_SECONDS", "30"))
@@ -142,7 +122,9 @@ async def embed_document(
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
-        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
+        
+        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        index = VectorStoreIndex.from_vector_store(vector_store)
 
         doc_id = all_data.doc_id
         file_name = all_data.file_name
@@ -227,7 +209,9 @@ async def query_docs(
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
-        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
+        
+        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        index = VectorStoreIndex.from_vector_store(vector_store)
 
         try:
             filters = Filter(
@@ -303,7 +287,9 @@ async def create_outline(
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
-        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
+        
+        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        index = VectorStoreIndex.from_vector_store(vector_store)
 
         try:
             filters = Filter(
@@ -358,7 +344,9 @@ async def delete_document(
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
-        index = await run_blocking(registry.get, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
+        
+        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        index = VectorStoreIndex.from_vector_store(vector_store)
 
         for node_id in data.node_ids:
             await run_blocking(index.delete, doc_id=node_id, delete_from_docstore=True)
