@@ -123,7 +123,7 @@ async def embed_document(
 ):
     async with heavy_request_semaphore:
         
-        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
         index = VectorStoreIndex.from_vector_store(vector_store)
 
         doc_id = all_data.doc_id
@@ -210,7 +210,7 @@ async def query_docs(
 ):
     async with heavy_request_semaphore:
         
-        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
         index = VectorStoreIndex.from_vector_store(vector_store)
 
         try:
@@ -288,7 +288,7 @@ async def create_outline(
 ):
     async with heavy_request_semaphore:
         
-        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
         index = VectorStoreIndex.from_vector_store(vector_store)
 
         try:
@@ -345,7 +345,7 @@ async def delete_document(
 ):
     async with heavy_request_semaphore:
         
-        vector_store = await run_blocking(get_vector_store, get_collection_name(x_customerkey), timeout=INDEX_TIMEOUT_SECONDS)
+        vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
         index = VectorStoreIndex.from_vector_store(vector_store)
 
         for node_id in data.node_ids:
