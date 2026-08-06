@@ -23,6 +23,7 @@ from qdrant_client.http.models import Filter, FieldCondition, MatchAny
 
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.embeddings.fastembed import FastEmbedEmbedding
 
 import qdrant_client
 from qdrant_client.models import Distance, VectorParams
@@ -46,7 +47,7 @@ s_llm = llm.as_structured_llm(output_cls=Outlines)
 
 Settings.llm = llm
 
-Settings.embed_model = HuggingFaceEmbedding(
+Settings.embed_model = FastEmbedEmbedding(
   model_name="BAAI/bge-m3"
 )
 

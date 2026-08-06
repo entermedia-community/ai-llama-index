@@ -3,8 +3,9 @@ fastapi[standard]
 ninja
 llama-cpp-python
 llama-index
-llama-index-embeddings-huggingface
 llama-index-llms-openai-like
 llama-index-vector-stores-qdrant
 qdrant_client
+fastembed
 uvicorn
+llama-index-embeddings-fastembed
