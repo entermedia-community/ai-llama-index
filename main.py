@@ -25,7 +25,8 @@ from qdrant_client.http.models import Filter, FieldCondition, MatchAny
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 
-import qdrant_client
+from qdrant_client import QdrantClient, AsyncQdrantClient
+
 from qdrant_client.models import Distance, VectorParams
 
 from utils.document_maker import DocumentMaker
@@ -51,14 +52,14 @@ Settings.embed_model = FastEmbedEmbedding(
   model_name="BAAI/bge-m3"
 )
 
-client = qdrant_client.QdrantClient(
+client = QdrantClient(
     host="localhost",
     port=6333,
     # host="74.48.140.178", 
     # port=27054
 )
 
-aclient = qdrant_client.AsyncQdrantClient(
+aclient = AsyncQdrantClient(
     host="localhost",
     port=6333,
     # host="74.48.140.178", 
