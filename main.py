@@ -1,5 +1,6 @@
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import asyncio
 import json
@@ -23,7 +24,6 @@ from qdrant_client.http.models import Filter, FieldCondition, MatchAny
 
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.embeddings.fastembed import FastEmbedEmbedding
 
 from qdrant_client import QdrantClient, AsyncQdrantClient
 
@@ -48,7 +48,7 @@ s_llm = llm.as_structured_llm(output_cls=Outlines)
 
 Settings.llm = llm
 
-Settings.embed_model = FastEmbedEmbedding(
+Settings.embed_model = HuggingFaceEmbedding(
   model_name="BAAI/bge-m3"
 )
 

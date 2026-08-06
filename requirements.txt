@@ -5,6 +5,6 @@ llama-cpp-python
 llama-index
 llama-index-llms-openai-like
 llama-index-vector-stores-qdrant
-qdrant_client 
+qdrant-client 
 uvicorn
 llama-index-embeddings-fastembed
