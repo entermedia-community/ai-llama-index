@@ -6,7 +6,7 @@ if [[ -f ".venv/bin/activate" ]]; then
 fi
 
 export CUDA_VISIBLE_DEVICES=1
-uvicorn main:app \
+python -m uvicorn main:app \
 	--host 0.0.0.0 \
 	--port 4600 \
 	--timeout-keep-alive 120 \

@@ -4,11 +4,10 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import asyncio
 import json
-from functools import partial, lru_cache
+from functools import partial
 
 from typing import Optional, List
 import logging
-from threading import Lock
 
 from fastapi import FastAPI, status, Header, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
