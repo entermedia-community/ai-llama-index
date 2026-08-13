@@ -52,17 +52,17 @@ Settings.embed_model = HuggingFaceEmbedding(
 )
 
 client = QdrantClient(
-    host="localhost",
-    port=6333,
-    # host="74.48.140.178", 
-    # port=27054
+    # host="localhost",
+    # port=6333,
+    host="mediadb45.entermediadb.net", 
+    port=6333
 )
 
 aclient = AsyncQdrantClient(
-    host="localhost",
-    port=6333,
-    # host="74.48.140.178", 
-    # port=27054
+    # host="localhost",
+    # port=6333,
+    host="mediadb45.entermediadb.net", 
+    port=6333
 )
 
 
