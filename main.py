@@ -215,6 +215,59 @@ class QueryDocsRequest(BaseModel):
     query: str = Field(..., min_length=5, description="The query string.")
     parent_ids: List[str] = Field(..., min_length=1, description="List of parent document IDs to filter by.")
 
+@app.post("/chat")
+async def chat_docs(
+    data: QueryDocsRequest,
+    x_customerkey: Optional[str] = Depends(get_collection_name)
+):
+    async with heavy_request_semaphore:
+        vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
+        index = VectorStoreIndex.from_vector_store(vector_store, use_async=True)
+
+        try:
+            filters = Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_id",
+                        match=MatchAny(
+                            any=data.parent_ids
+                        )
+                    )
+                ]
+            )
+
+            chat_engine = await run_blocking(
+                index.as_chat_engine,
+                chat_mode="context",
+                vector_store_kwargs={"qdrant_filters": filters},
+                use_async=True,
+                timeout=INDEX_TIMEOUT_SECONDS,
+            )
+            response = await asyncio.wait_for(chat_engine.achat(data.query), timeout=REQUEST_TIMEOUT_SECONDS)
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "query": data.query,
+                    "answer": str(response),
+                    "sources": [
+                        {
+                            **node.node.metadata,
+                            "score": node.score,
+                        }
+                        for node in response.source_nodes
+                    ]
+                }
+            )
+        except asyncio.TimeoutError:
+            raise
+        except Exception as e:
+            logger.error("Error during chat_docs: %s", str(e))
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": str(e)}
+            )
+
 @app.post("/query")
 async def query_docs(
     data: QueryDocsRequest,
