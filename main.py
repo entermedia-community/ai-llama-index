@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel, Field
 from llama_index.core import Settings, VectorStoreIndex, PromptTemplate
+from llama_index.core.memory import ChatMemoryBuffer
 
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -31,6 +32,8 @@ from qdrant_client.models import Distance, VectorParams
 from utils.document_maker import DocumentMaker
 
 from fastapi.middleware.gzip import GZipMiddleware
+
+from llama_index.core.llms import ChatMessage
 
 
 llm = OpenAILike(
@@ -215,9 +218,15 @@ class QueryDocsRequest(BaseModel):
     query: str = Field(..., min_length=5, description="The query string.")
     parent_ids: List[str] = Field(..., min_length=1, description="List of parent document IDs to filter by.")
 
+class ChatRequest(BaseModel):
+    query: str = Field(..., min_length=5, description="The query string.")
+    parent_ids: List[str] = Field(..., min_length=1, description="List of parent document IDs to filter by.")
+    # [{role: "user", content: "What is the capital of France?"}, {role: "assistant", content: "The capital of France is Paris."}]
+    chat_history: List[ChatMessage] = Field(..., description="List of chat messages representing the conversation history.")
+
 @app.post("/chat")
 async def chat_docs(
-    data: QueryDocsRequest,
+    data: ChatRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
@@ -236,9 +245,17 @@ async def chat_docs(
                 ]
             )
 
+            memory = ChatMemoryBuffer.from_defaults(chat_history=data.chat_history)
+
             chat_engine = await run_blocking(
                 index.as_chat_engine,
                 chat_mode="context",
+                memory=memory,
+                system_prompt="""You are a learning assistant.
+The conversation contains authoritative learning material,
+multiple-choice questions, learner answers, and explanations.
+Answer the learner's follow-up questions based primarily on
+the learning material provided in the conversation.""",
                 vector_store_kwargs={"qdrant_filters": filters},
                 use_async=True,
                 timeout=INDEX_TIMEOUT_SECONDS,
