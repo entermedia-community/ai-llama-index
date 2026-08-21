@@ -37,7 +37,7 @@ from llama_index.core.llms import ChatMessage
 
 
 llm = OpenAILike(
-    api_base="http://0.0.0.0:7600/", # Server uses local LLM
+    api_base="http://vast01:7600/", # Server uses local LLM
     # api_base="https://llamat.emediaworkspace.com/", # Use this for testing locally with the remote LLM
     is_chat_model=True,
     is_function_calling_model=True
@@ -57,14 +57,14 @@ Settings.embed_model = HuggingFaceEmbedding(
 client = QdrantClient(
     # host="localhost",
     # port=6333,
-    host="mediadb45.entermediadb.net", 
+    host="0.0.0.0", 
     port=6333
 )
 
 aclient = AsyncQdrantClient(
     # host="localhost",
     # port=6333,
-    host="mediadb45.entermediadb.net", 
+    host="0.0.0.0", 
     port=6333
 )
 
