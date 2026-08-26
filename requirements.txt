@@ -7,4 +7,4 @@ llama-index-llms-openai-like
 llama-index-vector-stores-qdrant
 qdrant-client 
 uvicorn
-llama-index-embeddings-fastembed
+llama-index-embeddings-huggingface
