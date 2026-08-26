@@ -1,6 +1,6 @@
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import asyncio
 import json
