@@ -25,11 +25,11 @@ router = APIRouter()
 
 @router.post("/create_structure")
 async def create_structure(
-    data: QueryDocsRequest,
+    data: PromptRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
-        promopt = PromptTemplate(data.prompt)
+        prompt = PromptTemplate(data.prompt)
         vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
         index = VectorStoreIndex.from_vector_store(vector_store, use_async=True)
 
