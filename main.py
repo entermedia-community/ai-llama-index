@@ -4,7 +4,7 @@ from fastapi import FastAPI, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from routers import root, save, chat, query, create_outline, delete_document
+from routers import root, save, chat, query, create_outline, create_structure, delete_document
 
 app = FastAPI()
 app.add_middleware(
@@ -17,6 +17,7 @@ app.include_router(save.router)
 app.include_router(chat.router)
 app.include_router(query.router)
 app.include_router(create_outline.router)
+app.include_router(create_structure.router)
 app.include_router(delete_document.router)
 
 
