@@ -3,8 +3,7 @@
 # Llama index launcher script
 
 
-# Kill any existing uvicorn processes and free up port 4600
-pkill -f "uvicorn main:app" || true
+# Kill any existing processes and free up port 4600
 lsof -ti :4600 | xargs -r kill -9
 
 if [[ -f ".venv/bin/activate" ]]; then
