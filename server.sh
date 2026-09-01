@@ -20,3 +20,5 @@ python -m uvicorn main:app \
 	--timeout-keep-alive 120 \
 	--workers 1  \
 	2>&1 | multilog t s5000000 n3 "$LOGFILE" &
+
+deactivate
