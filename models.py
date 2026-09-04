@@ -22,11 +22,6 @@ class QueryDocsRequest(BaseModel):
     query: str = Field(..., min_length=5, description="The query string.")
     parent_ids: List[str] = Field(..., min_length=1, description="List of parent document IDs to filter by.")
 
-
-class FindDocIdsRequest(BaseModel):
-    query: str = Field(..., min_length=5, description="The query string.")
-
-
 class PromptRequest(BaseModel):
     prompt: str = Field(..., min_length=5, description="The prompt.")
     query: str = Field(..., min_length=5, description="The query string.")
