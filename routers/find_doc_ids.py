@@ -14,7 +14,7 @@ from core import (
     INDEX_TIMEOUT_SECONDS,
     REQUEST_TIMEOUT_SECONDS,
 )
-from models import QueryDocsRequest
+from models import FindDocIdsRequest
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ router = APIRouter()
 
 @router.post("/findDocIds")
 async def find_doc_ids(
-    data: QueryDocsRequest,
+    data: FindDocIdsRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
