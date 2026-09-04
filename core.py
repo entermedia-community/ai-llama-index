@@ -21,8 +21,8 @@ from qdrant_client.models import Distance, VectorParams
 logger = logging.getLogger(__name__)
 
 llm = OpenAILike(
-    api_base="http://174.119.98.154:42063/", # Server uses local LLM
-    # api_base="https://llamat.emediaworkspace.com/", # Use this for testing locally with the remote LLM
+    #api_base="http://vast02:42063/", # Server uses local LLM
+    api_base="https://llamat.emediaworkspace.com/", # Use this for testing locally with the remote LLM
     api_key="dummy_api_key",  # Not used for local LLM, but required by the OpenAILike class
     is_chat_model=True,
     is_function_calling_model=True
