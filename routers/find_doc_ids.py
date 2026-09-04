@@ -5,7 +5,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from llama_index.core import VectorStoreIndex
-from qdrant_client.http.models import Filter, FieldCondition, MatchAny
 
 from core import (
     get_collection_name,
@@ -32,18 +31,8 @@ async def find_doc_ids(
         index = VectorStoreIndex.from_vector_store(vector_store, use_async=True)
 
         try:
-            filters = Filter(
-                must=[
-                    FieldCondition(
-                        key="parent_id",
-                        match=MatchAny(any=data.parent_ids)
-                    )
-                ]
-            )
-
             retriever = await run_blocking(
                 index.as_retriever,
-                vector_store_kwargs={"qdrant_filters": filters},
                 use_async=True,
                 timeout=INDEX_TIMEOUT_SECONDS,
             )
