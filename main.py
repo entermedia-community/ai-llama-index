@@ -1,10 +1,12 @@
 import asyncio
+import importlib
+import pkgutil
 
 from fastapi import FastAPI, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from routers import root, save, chat, query, create_outline, create_structure, delete_document
+import routers
 
 app = FastAPI()
 app.add_middleware(
@@ -12,13 +14,14 @@ app.add_middleware(
     minimum_size=500,
 )
 
-app.include_router(root.router)
-app.include_router(save.router)
-app.include_router(chat.router)
-app.include_router(query.router)
-app.include_router(create_outline.router)
-app.include_router(create_structure.router)
-app.include_router(delete_document.router)
+for module_info in sorted(pkgutil.iter_modules(routers.__path__), key=lambda module: module.name):
+    if module_info.name.startswith("_"):
+        continue
+
+    module = importlib.import_module(f"{routers.__name__}.{module_info.name}")
+    router = getattr(module, "router", None)
+    if router is not None:
+        app.include_router(router)
 
 
 @app.exception_handler(asyncio.TimeoutError)
