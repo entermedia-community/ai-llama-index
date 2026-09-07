@@ -57,7 +57,7 @@ async def find_doc_ids(
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
             doc_ids = {
-                node.node.metadata["parent_id"]
+                node.node.metadata
                 for node in nodes 
                 if node.node.metadata.get("parent_id") in allowed_parent_ids
             }
