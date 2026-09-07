@@ -32,17 +32,18 @@ async def find_doc_ids(
         index = VectorStoreIndex.from_vector_store(vector_store, use_async=True)
 
         try:
+            allowed_parent_ids = set(data.parent_ids)
+
             filters = Filter(
                 must=[
                     FieldCondition(
                         key="parent_id",
-                        match=MatchAny(any=data.parent_ids),
+                        match=MatchAny(any=allowed_parent_ids),
                     )
                 ]
             )
-            allowed_parent_ids = set(data.parent_ids)
-
-            similarity_top_k = max(len(data.parent_ids) * 2, 10)
+            
+            similarity_top_k = max(len(allowed_parent_ids) * 2, 10)
 
             retriever = await run_blocking(
                 index.as_retriever,
@@ -52,28 +53,23 @@ async def find_doc_ids(
                 use_async=True,
                 timeout=INDEX_TIMEOUT_SECONDS,
             )
+
             nodes = await asyncio.wait_for(
                 retriever.aretrieve(data.query),
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
 
-            matches = [
-                {
-                    "metadata": node.node.metadata,
-                    "score": node.score,
-                }
+            threshold = 0.5 if data.score_threshold is None else data.score_threshold
+
+            doc_ids = [
+                node.node.metadata["parent_id"]
                 for node in nodes
-                if node.node.metadata.get("parent_id") in allowed_parent_ids
-                and (
-                    data.score_threshold is None
-                    or (node.score is not None and node.score >= data.score_threshold)
-                )
+                if node.score is not None and node.score >= threshold
             ]
-            doc_ids = [match["metadata"] for match in matches]
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"doc_ids": doc_ids, "matches": matches}
+                content={"doc_ids": doc_ids}
             )
         except asyncio.TimeoutError:
             raise
