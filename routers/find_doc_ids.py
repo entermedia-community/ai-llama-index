@@ -66,8 +66,7 @@ async def find_doc_ids(
                 if node.node.metadata.get("parent_id") in allowed_parent_ids
                 and (
                     data.score_threshold is None
-                    or node.score is None
-                    or node.score >= data.score_threshold
+                    or (node.score is not None and node.score >= data.score_threshold)
                 )
             ]
             doc_ids = [match["metadata"] for match in matches]
