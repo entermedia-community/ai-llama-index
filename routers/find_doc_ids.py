@@ -40,8 +40,14 @@ async def find_doc_ids(
                     )
                 ]
             )
+            allowed_parent_ids = set(data.parent_ids)
+
+            similarity_top_k = max(len(data.parent_ids) * 2, 10)
+
             retriever = await run_blocking(
                 index.as_retriever,
+                similarity_top_k=similarity_top_k,
+                retriever_mode="embedding",
                 vector_store_kwargs={"qdrant_filters": filters},
                 use_async=True,
                 timeout=INDEX_TIMEOUT_SECONDS,
@@ -52,8 +58,8 @@ async def find_doc_ids(
             )
             doc_ids = {
                 node.node.metadata["parent_id"]
-                for node in nodes
-                if node.node.metadata.get("parent_id")
+                for node in nodes 
+                if node.node.metadata.get("parent_id") in allowed_parent_ids
             }
 
             return JSONResponse(
