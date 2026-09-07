@@ -57,11 +57,24 @@ async def find_doc_ids(
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
 
-            doc_ids = [node.node.metadata for node in nodes if node.node.metadata.get("parent_id") in allowed_parent_ids]
+            matches = [
+                {
+                    "metadata": node.node.metadata,
+                    "score": node.score,
+                }
+                for node in nodes
+                if node.node.metadata.get("parent_id") in allowed_parent_ids
+                and (
+                    data.score_threshold is None
+                    or node.score is None
+                    or node.score >= data.score_threshold
+                )
+            ]
+            doc_ids = [match["metadata"] for match in matches]
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"doc_ids": doc_ids}
+                content={"doc_ids": doc_ids, "matches": matches}
             )
         except asyncio.TimeoutError:
             raise

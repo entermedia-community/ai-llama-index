@@ -21,6 +21,10 @@ class CreateEmbeddingRequest(BaseModel):
 class QueryDocsRequest(BaseModel):
     query: str = Field(..., min_length=5, description="The query string.")
     parent_ids: List[str] = Field(..., min_length=1, description="List of parent document IDs to filter by.")
+    score_threshold: float | None = Field(
+        None,
+        description="Only return matches with a similarity score at or above this value.",
+    )
 
 class PromptRequest(BaseModel):
     prompt: str = Field(..., min_length=5, description="The prompt.")
