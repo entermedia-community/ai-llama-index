@@ -61,15 +61,17 @@ async def find_doc_ids(
 
             threshold = 0.5 if data.score_threshold is None else data.score_threshold
 
-            doc_ids = [
+            matched_parents = [
                 node.node.metadata["parent_id"]
                 for node in nodes
                 if node.score is not None and node.score >= threshold
             ]
 
+            matched_parents = list(dict.fromkeys(matched_parents))
+
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"doc_ids": doc_ids}
+                content={"parent_ids": matched_parents}
             )
         except asyncio.TimeoutError:
             raise
