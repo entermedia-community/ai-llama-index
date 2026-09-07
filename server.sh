@@ -6,6 +6,8 @@
 # Kill any existing processes and free up port 4600
 lsof -ti :4600 | xargs -r kill -9
 
+sleep 5
+
 if [[ -f ".venv/bin/activate" ]]; then
   source .venv/bin/activate
 fi
