@@ -50,10 +50,11 @@ async def find_doc_ids(
                 retriever.aretrieve(data.query),
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
+            allowed_parent_ids = set(data.parent_ids)
             doc_ids = {
                 node.node.metadata["parent_id"]
                 for node in nodes
-                if node.node.metadata.get("parent_id")
+                if node.node.metadata.get("parent_id") in allowed_parent_ids
             }
 
             return JSONResponse(
