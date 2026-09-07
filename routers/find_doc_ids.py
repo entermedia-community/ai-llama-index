@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from llama_index.core import VectorStoreIndex
+from qdrant_client.http.models import Filter, FieldCondition, MatchAny
 
 from core import (
     get_collection_name,
@@ -14,6 +15,7 @@ from core import (
     INDEX_TIMEOUT_SECONDS,
     REQUEST_TIMEOUT_SECONDS,
 )
+from models import QueryDocsRequest
 
 logger = logging.getLogger(__name__)
 
@@ -22,34 +24,37 @@ router = APIRouter()
 
 @router.post("/findDocIds")
 async def find_doc_ids(
+    data: QueryDocsRequest,
     x_customerkey: Optional[str] = Depends(get_collection_name)
 ):
     async with heavy_request_semaphore:
         vector_store = await run_blocking(get_vector_store, x_customerkey, timeout=INDEX_TIMEOUT_SECONDS)
+        index = VectorStoreIndex.from_vector_store(vector_store, use_async=True)
 
         try:
-            doc_ids = set()
-            offset = None
-
-            while True:
-                records, offset = await asyncio.wait_for(
-                    vector_store.aclient.scroll(
-                        collection_name=x_customerkey,
-                        limit=256,
-                        offset=offset,
-                        with_payload=["parent_id"],
-                        with_vectors=False,
-                    ),
-                    timeout=REQUEST_TIMEOUT_SECONDS,
-                )
-                doc_ids.update(
-                    record.payload["parent_id"]
-                    for record in records
-                    if record.payload and record.payload.get("parent_id")
-                )
-
-                if offset is None:
-                    break
+            filters = Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_id",
+                        match=MatchAny(any=data.parent_ids),
+                    )
+                ]
+            )
+            retriever = await run_blocking(
+                index.as_retriever,
+                vector_store_kwargs={"qdrant_filters": filters},
+                use_async=True,
+                timeout=INDEX_TIMEOUT_SECONDS,
+            )
+            nodes = await asyncio.wait_for(
+                retriever.aretrieve(data.query),
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            doc_ids = {
+                node.node.metadata["parent_id"]
+                for node in nodes
+                if node.node.metadata.get("parent_id")
+            }
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
