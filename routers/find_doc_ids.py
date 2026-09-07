@@ -56,15 +56,12 @@ async def find_doc_ids(
                 retriever.aretrieve(data.query),
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
-            doc_ids = {
-                node.node.metadata
-                for node in nodes 
-                if node.node.metadata.get("parent_id") in allowed_parent_ids
-            }
+
+            doc_ids = [node.node.metadata for node in nodes if node.node.metadata.get("parent_id") in allowed_parent_ids]
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"doc_ids": sorted(doc_ids)}
+                content={"doc_ids": doc_ids}
             )
         except asyncio.TimeoutError:
             raise
