@@ -15,7 +15,7 @@ fi
 LOGFILE=/root/logs/llamaindex
 mkdir -p "$LOGFILE"
 
-# export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 python -m uvicorn main:app \
 	--host 0.0.0.0 \
 	--port 4600 \
